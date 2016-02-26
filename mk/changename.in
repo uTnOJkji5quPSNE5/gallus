@@ -1,0 +1,72 @@
+#!/bin/sh
+
+if test $# -ne 2; then
+    exit 1
+fi
+
+move=''
+git status > /dev/null 2>&1
+if test $? -eq 0; then
+    move="git mv"
+else
+    move="mv"
+fi
+
+doMv() {
+    _ret=1
+    if test $# -eq 2; then
+	_from=${1}
+	_to=${2}
+	if test -e "${_from}"; then
+	    rm -rf "${_to}"
+	    ${move} "${_from}" "${_to}"
+	    _ret=$?
+	fi
+	unset _to _from
+    fi
+    return ${_ret}
+}
+
+
+fromUpperName=`echo ${1} | tr '[a-z]' '[A-Z]'`
+fromLowerName=`echo ${1} | tr '[A-Z]' '[a-z]'`
+toUpperName=`echo ${2} | tr '[a-z]' '[A-Z]'`
+toLowerName=`echo ${2} | tr '[A-Z]' '[a-z]'`
+
+l=`find . -type f | grep -v .git`
+
+for i in ${l}; do
+    mode=`@STAT@ "${i}"`
+    sed -e "s:${fromUpperName}:${toUpperName}:g" \
+	-e "s:${fromLowerName}:${toLowerName}:g" \
+	< "${i}" > "${i}.tmp"
+    rm -f "${i}"
+    mv -f "${i}.tmp" "${i}"
+    chmod ${mode} "${i}"
+done
+
+l=`find . -type f -name "*${fromUpperName}*" | grep -v .git`
+for i in ${l}; do
+    nm=`echo "${i}" | sed "s:${fromUpperName}:${toUpperName}:g"`
+    doMv "${i}" "${nm}"
+done
+
+l=`find . -type f -name "*${fromLowerName}*" | grep -v .git`
+for i in ${l}; do
+    nm=`echo "${i}" | sed "s:${fromLowerName}:${toLowerName}:g"`
+    doMv "${i}" "${nm}"
+done
+
+l=`find . -type d -name "*${fromUpperName}*" | grep -v .git`
+for i in ${l}; do
+    nm=`echo "${i}" | sed "s:${fromUpperName}:${toUpperName}:g"`
+    doMv "${i}" "${nm}"
+done
+
+l=`find . -type d -name "*${fromLowerName}*" | grep -v .git`
+for i in ${l}; do
+    nm=`echo "${i}" | sed "s:${fromLowerName}:${toLowerName}:g"`
+    doMv "${i}" "${nm}"
+done
+
+exit 0

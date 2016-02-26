@@ -1,0 +1,162 @@
+#!/bin/sh
+
+
+myName=`echo "${0}" | awk -F'/' '{ print $NF }'`
+
+
+stderr() {
+    echo ${1+"$@"} 1>&2
+}
+
+
+error() {
+    stderr ${myName}:error: ${1+"$@"}
+}
+
+
+warning() {
+    stderr ${myName}:warning: ${1+"$@"}
+}
+
+
+#
+
+
+sedTmp=/tmp/.${myName}.sedTmp.$$
+orgIncDir=''
+newIncDir=''
+doSystemize=0
+
+
+cleanup() {
+    rm -f "${sedTmp}"
+}
+
+
+setup() {
+    trap cleanup HUP INT QUIT TERM
+}
+
+
+getIncludes() {
+    if test ! -z "${orgIncDir}" -a -d "${orgIncDir}"; then
+	_orgCwd=`/bin/pwd`
+	cd "${orgIncDir}"
+	find . -type f | sed 's:^\./::'
+	cd "${_orgCwd}"
+	unset _orgCwd 
+	return 0
+    fi
+    return 1
+}
+
+
+genSedExpr() {
+    if test ! -z "${1}"; then
+	_e='s:^[[:space:]]*#[[:space:]]*include'
+	_e=${_e}'[[:space:]][[:space:]]*["<]'"${1}"'[">]:'
+	_bq='"'
+	_eq='"'
+	if test ${doSystemize} -eq 1; then
+	    _bq='<'
+	    _eq='>'
+	fi
+	if test -z "${newIncDir}"; then
+	    _e=${_e}'#include '${_bq}"${1}"${_eq}:
+	else
+	    _e=${_e}'#include '${_bq}"${newIncDir}/${1}"${_eq}:
+	fi
+	echo ${_e}
+	unset _e _bq _eq
+	return 0
+    fi
+    return 1
+}
+
+
+genSed() {
+    if test ! -z "${newIncDir}" -o ${doSystemize} -eq 1; then
+	_l=`getIncludes`
+	if test ! -z "${_l}"; then
+	    rm -f "${sedTmp}"
+	    echo "#!/bin/sh" > "${sedTmp}"
+	    echo "" >> "${sedTmp}"
+	    echo "exec sed \\" >> "${sedTmp}"
+	    for _i in ${_l}; do
+		echo "  -e '`genSedExpr ${_i}`' \\" >> "${sedTmp}"
+	    done
+	    echo "  \${1+\"\$@\"}" >> "${sedTmp}"
+	    chmod 755 "${sedTmp}"
+	    unset _i
+	    return 0
+	fi
+	unset _l
+	return 0
+    fi
+    return 1
+}
+
+
+doSed() {
+    if test -f "${sedTmp}"; then
+	for _i in ${1+"$@"}; do
+	    mode=`@STAT@ "${_i}"`
+	    ${sedTmp} "${_i}" > "${_i}".tmp
+	    rm -f "${_i}"
+	    mv -f "${_i}".tmp "${_i}"
+	    chmod ${mode} "${_i}"
+	done
+	unset _i
+	return 0
+    fi
+    return 1
+}
+
+
+#
+
+
+while
+case ${1} in
+    -I*)
+        dir=`echo ${1} | sed 's:^-I::'`
+	if test -z "${dir}"; then
+	    error "invalid include directory."
+	    exit 1
+	else
+	    orgIncDir="${dir}"
+	fi
+	unset dir
+	true ;;
+    -NI*)
+        dir=`echo ${1} | sed 's:^-NI::'`
+	if test -z "${dir}"; then
+	    error "invalid new include directory."
+	    exit 1
+	else
+	    newIncDir="${dir}"
+	fi
+	unset dir
+	true ;;
+    -s)
+	doSystemize=1
+	true ;;
+    *)
+	false ;;
+esac
+do
+    shift
+done
+
+if test -z "${newIncDir}" -a ${doSystemize} -eq 0; then
+    exit 0
+fi
+
+setup
+
+genSed
+doSed ${1+"$@"}
+
+cleanup
+
+exit 0

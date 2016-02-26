@@ -1,0 +1,21 @@
+#ifndef __GALLUS_PLATFORM_H__
+#define __GALLUS_PLATFORM_H__
+
+#define @OSDEF@
+#define @CPUDEF@
+
+#ifdef WORDS_BIGENDIAN
+#define GALLUS_BIG_ENDIAN
+#else
+#define GALLUS_LITTLE_ENDIAN
+#endif /* WORDS_BIGENDIAN */
+
+#if SIZEOF_LONG_INT == 8
+#define GALLUS_ARCH_64_BITS
+#elif SIZEOF_LONG_INT == 4
+#define GALLUS_ARCH_32_BITS
+#else
+#error Sorry we can not live like this.
+#endif /* SIZEOF_LONG_INT == 8 || SIZEOF_LONG_INT == 4 */
+
+#endif /* ! __GALLUS_PLATFORM_H__ */

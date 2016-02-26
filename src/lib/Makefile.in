@@ -1,0 +1,22 @@
+TOPDIR		= @TOPDIR@
+MKRULESDIR	= @MKRULESDIR@
+
+TARGET_LIB		= $(GALLUS_UTIL_LIB)
+INSTALL_LIB_TARGETS	= $(TARGET_LIB)
+INSTALL_LIB_DIR		= $(DEST_LIBDIR)
+
+SRCS =	error.c logger.c hashmap.c chrono.c lock.c thread.c \
+	strutils.c cbuffer.c qmuxer.c qpoll.c heapcheck.c signal.c \
+	pipeline_stage.c gstate.c module.c runnable.c dstring.c \
+	argv0.c ip_addr.c callout.c mainloop.c statistic.c numa.c
+
+LDFLAGS	+=	@GMP_LIBS@ @SSL_LIBS@ @NUMA_LIBS@ -lm
+
+TARGETS			= $(TARGET_LIB)
+
+DIRS	=	check test
+
+include $(MKRULESDIR)/vars.mk
+include $(MKRULESDIR)/rules.mk
+include .depend
+

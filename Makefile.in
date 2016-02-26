@@ -1,0 +1,41 @@
+TOPDIR		= @TOPDIR@
+MKRULESDIR	= @MKRULESDIR@
+
+include $(MKRULESDIR)/vars.mk
+
+DIRS	=	tools \
+		src/lib \
+		src/include
+
+include $(MKRULESDIR)/rules.mk
+
+clean::
+	$(RM) -r autom4te.cache config.log
+	find . -type f \( \
+		-name '*~' -o \
+		-name 'core' -o \
+		-name '*.core' -o \
+		-name 'vgcore.*' \
+	\) -exec rm -f {} \;
+
+distclean::	clean
+	$(RM) config.* mk/vars.mk mk/doxygen.conf \
+		mk/changeincludes mk/changename mk/initdepend \
+		./libtool
+	find . -type f \( \
+		-name '.depend' \
+	\) -exec rm -f {} \;
+	find . -type d \( \
+		-name '.libs' \
+	\) -exec rm -rf {} \;
+
+ultimateclean:	distclean
+	@git clean -n -f -d -x | \
+	sed 's:^Would[[:space:]][[:space:]]*remove[[:space:]][[:space:]]*::' | \
+	grep -v tools/unity | \
+	xargs rm -rf
+
+show-garbage:
+	@git clean -n -f -d -x | \
+	sed 's:^Would[[:space:]][[:space:]]*remove[[:space:]][[:space:]]*::' | \
+	grep -v tools/unity
