@@ -8,6 +8,11 @@ AC_SUBST(TOPDIR)
 
 AC_CONFIG_AUX_DIR(./mk)
 AC_CONFIG_MACRO_DIR(./mk)
+m4_include([mk/libtool.m4])
+m4_include([mk/ltoptions.m4])
+m4_include([mk/ltsugar.m4])
+m4_include([mk/ltversion.m4])
+m4_include([mk/lt~obsolete.m4])
 
 AC_CONFIG_HEADER([src/include/gallus_config.h])
 
@@ -469,7 +474,7 @@ AC_CONFIG_COMMANDS_PRE([
 			)
 		else
 			HAVE_UNITY=
-			AC_MSG_ERROR([Unity is not available. developer's build requires Unity. Please check https://github.com/gallus/gallus/blob/master/docs/how-to-write-tests-in-gallus.md.])
+			AC_MSG_ERROR([Unity is not available. developer's build requires Unity.])
 		fi
 	fi
 ])
