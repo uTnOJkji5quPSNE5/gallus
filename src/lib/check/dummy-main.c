@@ -1,3 +1,5 @@
+/* %COPYRIGHT% */
+
 #include "gallus_apis.h"
 
 
@@ -65,8 +67,8 @@ static gallus_chrono_t s_to = -1LL;
 static inline void
 usage(FILE *fd) {
   fprintf(fd, "usage:\n");
-  fprintf(fd, "\t--help\tshow this.\n");
-  fprintf(fd, "\t-to #\tset shutdown timeout (in sec.).\n");
+  fprintf(fd, "\t--help|-?\tshow this.\n");
+  fprintf(fd, "\t-to #\t\tset shutdown timeout (in sec.).\n");
   gallus_module_usage_all(fd);
   (void)fflush(fd);
 }
@@ -77,7 +79,8 @@ parse_args(int argc, const char *const argv[]) {
   (void)argc;
 
   while (*argv != NULL) {
-    if (strcmp("--help", *argv) == 0) {
+    if (strcmp("--help", *argv) == 0 ||
+        strcmp("-?", *argv) == 0) {
       usage(stderr);
       exit(0);
     } else if (strcmp("-to", *argv) == 0) {
@@ -113,59 +116,16 @@ main(int argc, const char *const argv[]) {
 
   parse_args(argc - 1, argv + 1);
 
-  (void)global_state_set(GLOBAL_STATE_INITIALIZING);
-
-  fprintf(stderr, "Initializing... ");
-  if ((st = gallus_module_initialize_all(argc, argv)) ==
-      GALLUS_RESULT_OK &&
-      s_got_term_sig == false) {
-    fprintf(stderr, "Initialized.\n");
-    fprintf(stderr, "Starting... ");
-    (void)global_state_set(GLOBAL_STATE_STARTING);
-    if ((st = gallus_module_start_all()) ==
-        GALLUS_RESULT_OK &&
-        s_got_term_sig == false) {
-      fprintf(stderr, "Started.\n");
-      if ((st = global_state_set(GLOBAL_STATE_STARTED)) ==
-          GALLUS_RESULT_OK) {
-
-        shutdown_grace_level_t l = SHUTDOWN_UNKNOWN;
-
-        fprintf(stderr, "Running.\n");
-
-        while ((st = global_state_wait_for_shutdown_request(&l,
-                     REQ_TIMEDOUT)) ==
-               GALLUS_RESULT_TIMEDOUT) {
-          gallus_msg_debug(5, "waiting shutdown request...\n");
-        }
-        if (st == GALLUS_RESULT_OK) {
-          if ((st = global_state_set(GLOBAL_STATE_ACCEPT_SHUTDOWN)) ==
-              GALLUS_RESULT_OK) {
-            if ((st = gallus_module_shutdown_all(l)) == GALLUS_RESULT_OK) {
-              if ((st = gallus_module_wait_all(s_to)) == GALLUS_RESULT_OK) {
-                fprintf(stderr, "Finished cleanly.\n");
-              } else if (st == GALLUS_RESULT_TIMEDOUT) {
-                fprintf(stderr, "Trying to stop forcibly...\n");
-                if ((st = gallus_module_stop_all()) == GALLUS_RESULT_OK) {
-                  if ((st = gallus_module_wait_all(s_to)) ==
-                      GALLUS_RESULT_OK) {
-                    fprintf(stderr, "Stopped forcibly.\n");
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+  if (s_to > 0) {
+    if ((st = gallus_mainloop_set_shutdown_check_interval(s_to)) !=
+        GALLUS_RESULT_OK) {
+      gallus_perror(st);
+      goto done;
     }
   }
 
-  gallus_module_finalize_all();
+  st = gallus_mainloop(argc, argv, NULL, NULL, false, false, false);
 
-  if (st != GALLUS_RESULT_OK) {
-    fprintf(stderr, "\n");
-    gallus_perror(st);
-  }
-
+done:
   return (st == GALLUS_RESULT_OK) ? 0 : 1;
 }
