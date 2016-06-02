@@ -189,9 +189,9 @@ s_final_numa_thingies(void) {
         (void)gallus_hashmap_destroy(&s_tbl, true);
       }
 
-      gallus_msg_debug(5, "The NUMA aware memory allocator is finalized.\n");
+      gallus_msg_debug(10, "The NUMA aware memory allocator is finalized.\n");
     } else {
-      gallus_msg_debug(5, "The NUMA aware memory allocator is not finalized"
+      gallus_msg_debug(10, "The NUMA aware memory allocator is not finalized"
                         "because of module finalization problem.\n");
     }
   }

@@ -31,7 +31,6 @@
 #include "gallus_callout.h"
 #include "gallus_mainloop.h"
 #include "gallus_statistic.h"
-#include "gallus/addrunion.h"
 #include "gallus_session.h"
 #include "gallus_session_tls.h"
 #include "gallus_ip_addr.h"

@@ -57,6 +57,9 @@ BUILD_SRCDIR	= $(TOPDIR)/src
 BUILD_INCDIR	= $(BUILD_SRCDIR)/include
 BUILD_LIBDIR	= $(BUILD_SRCDIR)/lib
 
+OSDEF	=	@OSDEF@
+CPUDEF	=	@CPUDEF@
+
 SITECONF_MK	?=	$(shell ls $(MKRULESDIR)/siteconf.mk 2>/dev/null)
 ifdef SITECONF_MK
 __SITECONF__=.pre.

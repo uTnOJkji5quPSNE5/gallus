@@ -1,5 +1,3 @@
-/* %COPYRIGHT% */
-
 #include "gallus_apis.h"
 
 
