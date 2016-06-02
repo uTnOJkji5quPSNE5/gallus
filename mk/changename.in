@@ -33,7 +33,7 @@ fromLowerName=`echo ${1} | tr '[A-Z]' '[a-z]'`
 toUpperName=`echo ${2} | tr '[a-z]' '[A-Z]'`
 toLowerName=`echo ${2} | tr '[A-Z]' '[a-z]'`
 
-l=`find . -type f | grep -v .git`
+l=`find . -type f | grep -v .git | grep -v tools/unity`
 
 for i in ${l}; do
     mode=`@STAT@ "${i}"`
