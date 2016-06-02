@@ -1,3 +1,5 @@
+/* %COPYRIGHT% */
+
 #ifndef __GALLUS_TYPES_H__
 #define __GALLUS_TYPES_H__
 

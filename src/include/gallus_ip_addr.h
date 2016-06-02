@@ -1,16 +1,22 @@
+#ifndef __GALLUS_IP_ADDR_H__
+#define __GALLUS_IP_ADDR_H__
+
+
 /**
  * @file	gallus_ip_addr.h
  */
 
-#ifndef __GALLUS_IP_ADDR_H__
-#define __GALLUS_IP_ADDR_H__
 
 #define GALLUS_ADDR_STR_MAX NI_MAXHOST
+
 
 /**
  * @brief	gallus_ip_address_t
  */
 typedef struct ip_address gallus_ip_address_t;
+
+
+
 
 
 __BEGIN_DECLS
@@ -100,8 +106,38 @@ gallus_result_t
 gallus_ip_address_sockaddr_get(const gallus_ip_address_t *ip,
                                 struct sockaddr **saddr);
 
+/**
+ * Get length of sockaddr structure.
+ *
+ *     @param[in]	ip	A pointer to a \e gallus_ip_address_t structure.
+ *     @param[out]	saddr_len	A pointer to a \e length of sockaddr structure
+ *
+ *     @retval	GALLUS_RESULT_OK	Succeeded.
+ *     @retval	GALLUS_RESULT_INVALID_ARGS	Failed, invalid argument(s).
+ */
+gallus_result_t
+gallus_ip_address_sockaddr_len_get(const gallus_ip_address_t *ip,
+                                    socklen_t *saddr_len);
+
+
+/**
+ * Is IPv4.
+ *
+ *     @param[in]	ip	A pointer to a \e gallus_ip_address_t structure.
+ *     @param[out]	is_ipv4	A pointer to a \e is_ipv4.
+ *
+ *     @retval	GALLUS_RESULT_OK	Succeeded.
+ *     @retval	GALLUS_RESULT_INVALID_ARGS	Failed, invalid argument(s).
+ */
+gallus_result_t
+gallus_ip_address_is_ipv4(const gallus_ip_address_t *ip,
+                           bool *is_ipv4);
+
 
 __END_DECLS
+
+
+
 
 
 #endif /* ! __GALLUS_IP_ADDR_H__ */
