@@ -474,8 +474,12 @@ AC_CONFIG_COMMANDS_PRE([
 			)
 		else
 			HAVE_UNITY=
-			AC_MSG_ERROR([Unity is not available. developer's build requires Unity.])
+			AC_MSG_ERROR([Unity is not available. developer build requires Unity.])
 		fi
+	fi
+	sh ./mk/genecode.sh
+	if test $? -ne 0; then
+	    AC_MSG_ERROR([Failed to generate error code and error string.])
 	fi
 ])
 AC_SUBST(HAVE_UNITY)

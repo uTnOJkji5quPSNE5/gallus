@@ -19479,8 +19479,12 @@ $as_echo "unity is available." >&6; }
 
 		else
 			HAVE_UNITY=
-			as_fn_error $? "Unity is not available. developer's build requires Unity." "$LINENO" 5
+			as_fn_error $? "Unity is not available. developer build requires Unity." "$LINENO" 5
 		fi
+	fi
+	sh ./mk/genecode.sh
+	if test $? -ne 0; then
+	    as_fn_error $? "Failed to generate error code and error string." "$LINENO" 5
 	fi
 
 
