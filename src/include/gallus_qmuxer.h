@@ -13,6 +13,12 @@
 
 
 
+__BEGIN_DECLS
+
+
+
+
+
 typedef struct gallus_cbuffer_record 	*gallus_cbuffer_t;
 #define __GALLUS_CBUFFER_T_DEFINED__
 typedef struct gallus_qmuxer_record *gallus_qmuxer_t;
@@ -34,9 +40,6 @@ typedef enum {
 
 
 
-
-
-__BEGIN_DECLS
 
 
 /**
@@ -222,7 +225,6 @@ gallus_qmuxer_poll(gallus_qmuxer_t *qmxptr,
 
 
 
-
 /**
  * Cleanup an internal state of a qmuxer after thread
  * cancellation.
@@ -230,6 +232,9 @@ gallus_qmuxer_poll(gallus_qmuxer_t *qmxptr,
  */
 void
 gallus_qmuxer_cancel_janitor(gallus_qmuxer_t *qmxptr);
+
+
+
 
 
 __END_DECLS

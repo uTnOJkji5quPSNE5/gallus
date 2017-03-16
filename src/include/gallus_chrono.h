@@ -13,6 +13,12 @@
 
 
 
+__BEGIN_DECLS
+
+
+
+
+
 gallus_chrono_t
 gallus_chrono_now(void);
 
@@ -68,6 +74,12 @@ gallus_rdtsc(void) {
   return 0LL;
 }
 #endif /* __GNUC__ */
+
+
+
+
+
+__END_DECLS
 
 
 

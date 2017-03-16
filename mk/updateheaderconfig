@@ -101,7 +101,7 @@ done
 
 confDefsOut=./.confDefsOut.$$
 > ${confDefsOut}
-grep AC_DEFINE ./configure.ac | awk -F'(' '{ print $NF }' | \
+grep AC_DEFINE ./configure.ac | awk -F'(' '{ print $3 }' | \
     sed 's:).*$::' | sort > ${confDefsOut}
 adds=`diff ${defsOut} ${confDefsOut} | grep '^>' | \
     sed 's:^>[ ]*::'`

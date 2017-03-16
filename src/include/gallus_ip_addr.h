@@ -1,19 +1,11 @@
-#ifndef __GALLUS_IP_ADDR_H__
-#define __GALLUS_IP_ADDR_H__
-
-
 /**
  * @file	gallus_ip_addr.h
  */
 
+#ifndef __GALLUS_IP_ADDR_H__
+#define __GALLUS_IP_ADDR_H__
 
 #define GALLUS_ADDR_STR_MAX NI_MAXHOST
-
-
-/**
- * @brief	gallus_ip_address_t
- */
-typedef struct ip_address gallus_ip_address_t;
 
 
 
@@ -21,6 +13,14 @@ typedef struct ip_address gallus_ip_address_t;
 
 __BEGIN_DECLS
 
+
+
+
+
+/**
+ * @brief	gallus_ip_address_t
+ */
+typedef struct ip_address gallus_ip_address_t;
 
 /**
  * Create a gallus_ip_address_t.
@@ -134,10 +134,13 @@ gallus_ip_address_is_ipv4(const gallus_ip_address_t *ip,
                            bool *is_ipv4);
 
 
+
+
+
 __END_DECLS
 
 
 
 
 
-#endif /* ! __GALLUS_IP_ADDR_H__ */
+#endif /* __GALLUS_IP_ADDR_H__ */

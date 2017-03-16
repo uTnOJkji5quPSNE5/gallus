@@ -19,15 +19,17 @@ clean::
 	\) -exec rm -f {} \;
 
 distclean::	clean
-	$(RM) config.* mk/vars.mk mk/doxygen.conf \
+	$(RM) -r ./tools/unity/* ./tools/unity/.??*
+	$(RM) config.* mk/vars.mk mk/doxygen.conf ./libtool \
 		mk/changeincludes mk/changename mk/initdepend \
-		./libtool
+		src/include/gallus_ecode.h \
+		src/lib/ecode.c
 	find . -type f \( \
 		-name '.depend' \
-	\) -exec rm -f {} \;
+	\) | xargs $(RM)
 	find . -type d \( \
 		-name '.libs' \
-	\) -exec rm -rf {} \;
+	\) | xargs $(RM) -r
 
 ultimateclean:	distclean
 	@git clean -n -f -d -x | \

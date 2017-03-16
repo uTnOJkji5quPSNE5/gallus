@@ -28,6 +28,12 @@ typedef struct gallus_runnable_record 	*gallus_runnable_t;
 
 
 
+__BEGIN_DECLS
+
+
+
+
+
 /**
  * Create a runnable.
  *
@@ -77,6 +83,12 @@ gallus_runnable_destroy(gallus_runnable_t *rptr);
  */
 gallus_result_t
 gallus_runnable_start(const gallus_runnable_t *rptr);
+
+
+
+
+
+__END_DECLS
 
 
 

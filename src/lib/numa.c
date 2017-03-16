@@ -23,7 +23,8 @@ static void s_dtors(void) __attr_destructor__(105);
 
 
 
-typedef void *	(*numa_alloc_proc_t)(size_t sz, int cpu);
+typedef void *	(*numa_alloc_node_proc_t)(size_t sz, unsigned int node);
+typedef void *	(*numa_alloc_cpu_proc_t)(size_t sz, int cpu);
 typedef void	(*numa_free_proc_t)(void *p);
 
 
@@ -42,14 +43,17 @@ static unsigned int s_max_numa_node = 0;
 static unsigned int *s_numa_nodes;
 static gallus_hashmap_t s_tbl;
 
-static numa_alloc_proc_t s_alloc_proc = NULL;
+static numa_alloc_node_proc_t s_alloc_node_proc = NULL;
+static numa_alloc_cpu_proc_t s_alloc_cpu_proc = NULL;
 static numa_free_proc_t s_free_proc = NULL;
 
-static void *	s_numa_alloc(size_t sz, int cpu);
+static void *	s_numa_alloc_node(size_t sz, unsigned int node);
+static void *	s_numa_alloc_cpu(size_t sz, int cpu);
 static void	s_numa_free(void *p);
 
 #ifndef DO_NUMA_EVNE_ONE_NODE
-static void *	s_uma_alloc(size_t sz, int cpu);
+static void *	s_uma_alloc_node(size_t sz, unsigned int node);
+static void *	s_uma_alloc_cpu(size_t sz, int cpu);
 static void	s_uma_free(void *p);
 #endif /* ! DO_NUMA_EVNE_ONE_NODE */
 
@@ -122,9 +126,10 @@ s_init_numa_thingies(void) {
         if (r == GALLUS_RESULT_OK) {
           s_is_numa = true;
 
-          s_alloc_proc = s_numa_alloc;
+          s_alloc_node_proc = s_numa_alloc_node;
+          s_alloc_cpu_proc = s_numa_alloc_cpu;
           s_free_proc = s_numa_free;
-          
+
           gallus_msg_debug(5, "The NUMA aware memory allocator is "
                             "initialized.\n");
         } else {
@@ -133,7 +138,8 @@ s_init_numa_thingies(void) {
                              "NUMA memory allocation table.\n");
         }
       } else {
-        s_alloc_proc = s_uma_alloc;
+        s_alloc_node_proc = s_uma_alloc_node;
+        s_alloc_cpu_proc = s_uma_alloc_cpu;
         s_free_proc = s_uma_free;
 
         gallus_msg_debug(5, "There is only one NUMA node on this machine. "
@@ -145,9 +151,10 @@ s_init_numa_thingies(void) {
       if (r == GALLUS_RESULT_OK) {
         s_is_numa = true;
 
-        s_alloc_proc = s_numa_alloc;
+        s_alloc_node_proc = s_numa_alloc_node;
+        s_alloc_cpu_proc = s_numa_alloc_cpu;
         s_free_proc = s_numa_free;
-          
+
         gallus_msg_debug(5, "The NUMA aware memory allocator is "
                           "initialized.\n");
       } else {
@@ -262,69 +269,85 @@ s_delete_addr(void *addr) {
 
 
 static void *
-s_numa_alloc(size_t sz, int cpu) {
+s_numa_alloc_node(size_t sz, unsigned int node) {
+  void *ret = NULL;
+
+  if (likely(sz > 0)) {
+    unsigned int allocd_node = UINT_MAX;
+    struct bitmask *bmp;
+    int r;
+
+    bmp = numa_allocate_nodemask();
+    numa_bitmask_setbit(bmp, node);
+
+    errno = 0;
+    r = (int)set_mempolicy(MPOL_BIND, bmp->maskp, bmp->size + 1);
+    if (likely(r == 0)) {
+      errno = 0;
+      ret = numa_alloc_onnode(sz, (int)node);
+      if (likely(ret != NULL)) {
+        gallus_result_t rl;
+
+        /*
+         * We need this "first touch" even using the
+         * numa_alloc_onnode().
+         */
+        (void)memset(ret, 0, sz);
+
+        errno = 0;
+        r = (int)get_mempolicy((int *)&allocd_node, NULL, 0, ret,
+                               MPOL_F_NODE|MPOL_F_ADDR);
+        if (likely(r == 0)) {
+          if (unlikely(node != allocd_node)) {
+            /*
+             * The memory is not allocated on the node, but it is
+             * still usable. Just return it.
+             */
+            gallus_msg_warning("can't allocate " PFSZ(u) " bytes memory "
+                                "on NUMA node %d.\n",
+                                sz, node);
+          }
+        } else {
+          gallus_perror(GALLUS_RESULT_POSIX_API_ERROR);
+          gallus_msg_error("get_mempolicy() returned %d.\n", r);
+        }
+
+        rl = s_add_addr(ret, sz);
+        if (unlikely(rl != GALLUS_RESULT_OK)) {
+          gallus_perror(rl);
+          gallus_msg_error("can't register the allocated address.\n");
+          numa_free(ret, sz);
+          ret = NULL;
+        }
+      }
+    } else {	/* r == 0 */
+      gallus_perror(GALLUS_RESULT_POSIX_API_ERROR);
+      gallus_msg_error("set_mempolicy() returned %d.\n", r);
+    }
+
+    numa_free_nodemask(bmp);
+    set_mempolicy(MPOL_DEFAULT, NULL, 0);
+
+  } else {	/* sz > 0 */
+    /*
+     * Use pure malloc(3) for compat.
+     */
+    ret = malloc(sz);
+  }
+
+  return ret;
+}
+
+
+static void *
+s_numa_alloc_cpu(size_t sz, int cpu) {
   void *ret = NULL;
 
   if (likely(sz > 0)) {
     if (likely(cpu >= 0)) {
       if (likely(s_numa_nodes != NULL && s_n_cpus > 0)) {
         unsigned int node = s_numa_nodes[cpu];
-        unsigned int allocd_node = UINT_MAX;
-        struct bitmask *bmp;
-        int r;
-  
-        bmp = numa_allocate_nodemask();
-        numa_bitmask_setbit(bmp, node);
-
-        errno = 0;
-        r = (int)set_mempolicy(MPOL_BIND, bmp->maskp, bmp->size + 1);
-        if (likely(r == 0)) {
-          errno = 0;
-          ret = numa_alloc_onnode(sz, (int)node);
-          if (likely(ret != NULL)) {
-            gallus_result_t rl;
-
-            /*
-             * We need this "first touch" even using the
-             * numa_alloc_onnode().
-             */
-            (void)memset(ret, 0, sz);
-
-            errno = 0;
-            r = (int)get_mempolicy((int *)&allocd_node, NULL, 0, ret,
-                                   MPOL_F_NODE|MPOL_F_ADDR);
-            if (likely(r == 0)) {
-              if (unlikely(node != allocd_node)) {
-                /*
-                 * The memory is not allocated on the node, but it is
-                 * still usable. Just return it.
-                 */
-                gallus_msg_warning("can't allocate " PFSZ(u) " bytes memory "
-                                    "for CPU %d (NUMA node %d).\n",
-                                    sz, cpu, node);
-              }
-            } else {
-              gallus_perror(GALLUS_RESULT_POSIX_API_ERROR);
-              gallus_msg_error("get_mempolicy() returned %d.\n", r);
-            }
-
-            rl = s_add_addr(ret, sz);
-            if (unlikely(rl != GALLUS_RESULT_OK)) {
-              gallus_perror(rl);
-              gallus_msg_error("can't register the allocated address.\n");
-              numa_free(ret, sz);
-              ret = NULL;
-            }
-          }
-
-        } else {	/* r == 0 */
-          gallus_perror(GALLUS_RESULT_POSIX_API_ERROR);
-          gallus_msg_error("set_mempolicy() returned %d.\n", r);
-        }
-
-        numa_free_nodemask(bmp);
-        set_mempolicy(MPOL_DEFAULT, NULL, 0);
-
+	ret = s_numa_alloc_node(sz, node);
       } else {	/* s_numa_nodes != NULL && s_n_cpus > 0 */
         /*
          * Not initialized or initialization failure.
@@ -333,14 +356,12 @@ s_numa_alloc(size_t sz, int cpu) {
                             "Use malloc(3) instead.\n");
         ret = malloc(sz);
       }
-
     } else {	/* cpu >= 0 */
       /*
        * Use pure malloc(3).
        */
       ret = malloc(sz);
     }
-
   }
 
   return ret;
@@ -368,8 +389,17 @@ s_numa_free(void *p) {
 
 #ifndef DO_NUMA_EVNE_ONE_NODE
 
+
 static void *
-s_uma_alloc(size_t sz, int cpu) {
+s_uma_alloc_node(size_t sz, unsigned int node) {
+  (void)node;
+
+  return malloc(sz);
+}
+
+
+static void *
+s_uma_alloc_cpu(size_t sz, int cpu) {
   (void)cpu;
 
   return malloc(sz);
@@ -388,9 +418,29 @@ s_uma_free(void *p) {
 
 
 void *
+gallus_malloc_on_numanode(size_t sz, unsigned int node) {
+  if (likely(s_alloc_node_proc != NULL)) {
+    return s_alloc_node_proc(sz, node);
+  } else {
+    gallus_exit_fatal("The NUMA aware allocator not initialized??\n");
+  }
+}
+
+
+void *
 gallus_malloc_on_cpu(size_t sz, int cpu) {
-  if (likely(s_alloc_proc != NULL)) {
-    return s_alloc_proc(sz, cpu);
+  if (likely(s_alloc_cpu_proc != NULL)) {
+    return s_alloc_cpu_proc(sz, cpu);
+  } else {
+    gallus_exit_fatal("The NUMA aware allocator not initialized??\n");
+  }
+}
+
+
+void
+gallus_free_on_numanode(void *p) {
+  if (likely(s_free_proc != NULL)) {
+    return s_free_proc(p);
   } else {
     gallus_exit_fatal("The NUMA aware allocator not initialized??\n");
   }
@@ -432,10 +482,24 @@ s_dtors(void) {
 
 
 void *
+gallus_malloc_on_numanode(size_t sz, unsigned int node) {
+  (void)node;
+
+  return malloc(sz);
+}
+
+
+void *
 gallus_malloc_on_cpu(size_t sz, int cpu) {
   (void)cpu;
 
   return malloc(sz);
+}
+
+
+void
+gallus_free_on_numanode(void *p) {
+  free(p);
 }
 
 

@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Consider to use -p ?
+#	It makes (char *)&((*aptr)->a) to (char *) & ((*aptr)->a), though.
+
 beautify() {
     astyle \
 	--mode=c \

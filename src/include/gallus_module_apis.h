@@ -16,6 +16,15 @@
 #define GALLUS_MODULE_CONSTRUCTOR_INDEX_BASE	1000
 
 
+
+
+
+__BEGIN_DECLS
+
+
+
+
+
 /**
  * Initialize the module.
  *
@@ -145,9 +154,6 @@ typedef void
 
 
 
-__BEGIN_DECLS
-
-
 /**
  * Register a module.
  *
@@ -272,6 +278,9 @@ gallus_module_find(const char *name);
  */
 bool	gallus_module_is_finalized_cleanly(void);
 bool	gallus_module_is_unloading(void);
+
+
+
 
 
 __END_DECLS

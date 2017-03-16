@@ -31,6 +31,9 @@ typedef struct gallus_pipeline_stage_record 	*gallus_pipeline_stage_t;
 __BEGIN_DECLS
 
 
+
+
+
 /**
  * Create a pipeline stage.
  *
@@ -428,7 +431,13 @@ gallus_pipeline_stage_get_name(const gallus_pipeline_stage_t *sptr,
                                 const char **name);
 
 
+
+
+
 __END_DECLS
 
 
-#endif /* ! __GALLUS_PIPELINE_STAGE_H__ */
+
+
+
+#endif /* __GALLUS_PIPELINE_STAGE_H__ */

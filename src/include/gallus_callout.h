@@ -33,6 +33,9 @@ typedef struct gallus_callout_task_record 	*gallus_callout_task_t;
 __BEGIN_DECLS
 
 
+
+
+
 /**
  * The signature of the callout handler idle function.
  *
@@ -233,6 +236,9 @@ gallus_callout_task_reset_interval(gallus_callout_task_t *tptr,
 gallus_result_t
 gallus_callout_task_state(gallus_callout_task_t *tptr,
                            gallus_callout_task_state_t *sptr);
+
+
+
 
 
 __END_DECLS

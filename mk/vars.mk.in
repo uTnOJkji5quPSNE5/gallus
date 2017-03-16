@@ -22,7 +22,6 @@ DEST_EXEDIR	= $(prefix)/bin
 DEST_SBIN_EXEDIR	= $(prefix)/sbin
 DEST_LIBDIR	= $(prefix)/lib
 DEST_HDRDIR_TOP	= $(prefix)/include
-DEST_CONFDIR	= $(sysconfdir)
 
 LIBTOOL_DEPS	= @LIBTOOL_DEPS@
 
@@ -41,12 +40,6 @@ LINK_CXX	= $(CXX)
 YACC		= @YACC@
 LEX		= @LEX@
 AWK		= @AWK@
-
-RTE_SDK         = @RTE_SDK@
-RTE_TARGET      = @RTE_TARGET@
-RTE_LIBDIR	= @RTE_LIBDIR@
-RTE_ARCH        = @RTE_ARCH@
-RTE_OS          = @RTE_OS@
 
 INSTALL		= @INSTALL@
 INSTALL_DATA	= @INSTALL_DATA@
@@ -75,7 +68,7 @@ SUBMODULES	=
 CPPFLAGS	+= @OS_CPPFLAGS@
 CPPFLAGS	+= -I$(BUILD_INCDIR)
 
-WARN_BASE_CFLAGS	+= -W -Wall -Wextra -std=gnu99 \
+WARN_BASE_CFLAGS	+= -W -Wall -Wextra \
 	-Wshadow \
 	-Wcast-align \
 	-Wwrite-strings \
@@ -86,7 +79,8 @@ WARN_BASE_CFLAGS	+= -W -Wall -Wextra -std=gnu99 \
 	-Wno-variadic-macros
 #	-Wlogical-op
 
-WARN_CFLAGS	+= $(WARN_BASE_CFLAGS) \
+WARN_CFLAGS	+= 	-std=gnu99 \
+	$(WARN_BASE_CFLAGS) \
 	-Wstrict-prototypes \
 	-Wold-style-definition \
 	-Wmissing-declarations \
@@ -94,7 +88,8 @@ WARN_CFLAGS	+= $(WARN_BASE_CFLAGS) \
 	-Wnested-externs \
 	-Wdeclaration-after-statement
 
-WARN_CXXFLAGS	+= $(WARN_BASE_CFLAGS) \
+WARN_CXXFLAGS	+=	-std=gnu++11 \
+	$(WARN_BASE_CFLAGS) \
 	-Wnon-virtual-dtor \
 	-Wstrict-null-sentinel \
 	-Woverloaded-virtual
@@ -119,7 +114,9 @@ CXXFLAGS	+= @OS_CFLAGS@ @CXXFLAGS@ $(COMMON_CXXFLAGS)
 
 LDFLAGS		+= @OS_LDFLAGS@ @OS_LIBS@ @LDFLAGS@
 
-OBJS		?= $(SRCS:.c=.lo)
+OBJS		?= $(filter-out $(SRCS),$(SRCS:.c=.lo)) \
+			$(filter-out $(SRCS),$(SRCS:.cc=.lo)) \
+			$(filter-out $(SRCS),$(SRCS:.cpp=.lo))
 
 ifdef TARGET_LIB
 SHLIB_VERSION	?= 0:0:0
@@ -129,6 +126,7 @@ LTLINK_RPATH	= -rpath $(DEST_LIBDIR)
 LTLINK_RUNPATH	=
 LTLINK_RUNPATH	+= \
 	-R$(RUNPATH_GALLUS_UTIL_LIB)
+
 LTLINK_RUNPATH	+= -R$(DEST_LIBDIR)
 
 
@@ -157,6 +155,7 @@ LTCLEAN		= $(LIBTOOL) --mode=clean $(RM)
 HAVE_RUBY		= @HAVE_RUBY@
 RUBY			= ruby
 
+HAVE_PROTOC		= @HAVE_PROTOC@
 HAVE_UNITY		= @HAVE_UNITY@
 TEST_RESULT_DIR		= $(TOPDIR)/test_result_dir
 UNITY_DIR		= $(TOPDIR)/tools/unity
@@ -169,6 +168,8 @@ UNITY_LIB		= libunity.la
 DEP_UNITY_LIB		= $(BUILDUNITY_DIR)/$(UNITY_LIB)
 
 HAVE_GCOVR		= @HAVE_GCOVR@
+
+HAVE_PAPI		= @HAVE_PAPI@
 
 ifdef SITECONF_MK
 __SITECONF__=.post.

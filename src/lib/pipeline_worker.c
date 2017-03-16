@@ -558,4 +558,4 @@ s_worker_maintenance(gallus_pipeline_worker_t w,
 
 
 
-#endif /* ! __PIPLELINE_WORKER_C__ */
+#endif /* __PIPLELINE_WORKER_C__ */

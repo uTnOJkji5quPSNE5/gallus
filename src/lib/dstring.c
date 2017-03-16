@@ -1,8 +1,5 @@
 #include "gallus_apis.h"
-
-
-
-
+#include "gallus_dstring.h"
 
 #define NULL_STR_SIZE 1   /* size of '\0'. */
 #define ALLOC_SIZE(_n) (sizeof(char) * (_n))

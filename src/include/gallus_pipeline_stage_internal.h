@@ -80,4 +80,4 @@ typedef struct gallus_pipeline_stage_record {
 
 
 
-#endif /* ! __GALLUS_PIPELINE_STAGE_INTERNAL_H__ */
+#endif /* __GALLUS_PIPELINE_STAGE_INTERNAL_H__ */

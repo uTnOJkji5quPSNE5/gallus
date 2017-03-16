@@ -21,6 +21,12 @@
 
 
 
+__BEGIN_DECLS
+
+
+
+
+
 typedef unsigned int gallus_hashmap_type_t;
 
 
@@ -47,9 +53,6 @@ typedef void
 
 
 
-
-
-__BEGIN_DECLS
 
 
 /**
@@ -495,6 +498,9 @@ gallus_hashmap_statistics(gallus_hashmap_t *hmptr,
  */
 void
 gallus_hashmap_atfork_child(gallus_hashmap_t *hmptr);
+
+
+
 
 
 __END_DECLS

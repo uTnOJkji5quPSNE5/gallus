@@ -5,6 +5,14 @@
 
 
 
+#ifdef __cplusplus
+#define restrict /**/
+#endif /* __cplusplus */
+
+
+
+
+
 /**
  *	@file	gallus_types.h
  */

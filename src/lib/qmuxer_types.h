@@ -22,4 +22,4 @@ typedef struct gallus_qmuxer_record {
 
 
 
-#endif /* ! __QMUXER_TYPES_H__ */
+#endif /* __QMUXER_TYPES_H__ */

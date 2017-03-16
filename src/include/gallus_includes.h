@@ -163,8 +163,6 @@
 #include <sys/socket.h>
 #endif /* HAVE_SYS_SOCKET_H */
 
-#ifdef HAVE_NUMA
-
 #ifdef HAVE_NUMA_H
 #include <numa.h>
 #endif /* HAVE_NUMA_H */
@@ -173,6 +171,5 @@
 #include <numaif.h>
 #endif /* HAVE_NUMAIF_H */
 
-#endif /* HAVE_NUMA */
 
 #endif /* ! __GALLUS_INCLUDES_H__ */

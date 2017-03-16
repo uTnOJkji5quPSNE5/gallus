@@ -8,6 +8,9 @@
 __BEGIN_DECLS
 
 
+
+
+
 /**
  * Set a certificate store in a session_tls.
  *
@@ -223,10 +226,13 @@ gallus_session_tls_set_certcheck(gallus_session_t s, gallus_result_t
                                   (*func)(const char *, const char *));
 
 
+
+
+
 __END_DECLS
 
 
 
 
 
-#endif /* ! __GALLUS_SESSION_TLS_H__ */
+#endif /* __GALLUS_SESSION_TLS_H__ */

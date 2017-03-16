@@ -5,14 +5,20 @@
 #ifndef __GALLUS_DSTRING_H__
 #define __GALLUS_DSTRING_H__
 
-/**
- * @brief	gallus_dstring_t
- */
-typedef struct dstring *gallus_dstring_t;
+
+
 
 
 __BEGIN_DECLS
 
+
+
+
+
+/**
+ * @brief	gallus_dstring_t
+ */
+typedef struct dstring *gallus_dstring_t;
 
 /**
  * Create a dynamic string.
@@ -207,7 +213,13 @@ bool
 gallus_dstring_empty(gallus_dstring_t *ds);
 
 
+
+
+
 __END_DECLS
 
 
-#endif /* ! __GALLUS_DSTRING_H__ */
+
+
+
+#endif /* __GALLUS_DSTRING_H__ */

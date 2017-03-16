@@ -1,10 +1,6 @@
 #ifndef __SESSION_INTERNAL_H__
 #define __SESSION_INTERNAL_H__
 
-
-
-
-
 #define SESSION_BUFSIZ 4096
 
 struct session {
@@ -34,9 +30,5 @@ struct session {
   void *ctx;
 };
 
-
-
-
-
-#endif /* ! __SESSION_INTERNAL_H__ */
+#endif /* __SESSION_INTERNAL_H__ */
 

@@ -35,4 +35,4 @@ typedef callout_task_state_t	gallus_callout_task_state_t;
 
 
 
-#endif /* ! __GALLUS_CALLOUT_TASK_STATE_H__ */
+#endif /* __GALLUS_CALLOUT_TASK_STATE_H__ */

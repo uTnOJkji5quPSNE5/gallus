@@ -14,6 +14,18 @@
 
 
 /**
+ * Allocate dynamic memory on a specified NUMA node
+ *
+ *	@param[in]	sz	A size to allocate (in bytes.)
+ *	@param[in]	node	A NUMA node.
+ *
+ *	@retval	!=NULL		Succeeded, the allocated memory.
+ *	@retval NULL		Failed.
+ */
+void *	gallus_malloc_on_numanode(size_t sz, unsigned int node);
+
+
+/**
  * Allocate dynamic memory on the nearest NUMA node which the
  * specified CPU belongs.
  *
@@ -27,6 +39,14 @@
  *	@retval NULL		Failed.
  */
 void *	gallus_malloc_on_cpu(size_t sz, int cpu);
+
+
+/**
+ * Free memory allocated by the \b gallus_malloc_on_numanode().
+ *
+ *	@param[in]	p	A pointer to memory.
+ */
+void	gallus_free_on_numanode(void *p);
 
 
 /**

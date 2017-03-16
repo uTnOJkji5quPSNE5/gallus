@@ -13,6 +13,12 @@
 
 
 
+__BEGIN_DECLS
+
+
+
+
+
 typedef struct gallus_statistic_struct	*gallus_statistic_t;
 
 
@@ -163,6 +169,12 @@ gallus_statistic_average(gallus_statistic_t *sptr, double *valptr);
  */
 gallus_result_t
 gallus_statistic_sd(gallus_statistic_t *sptr, double *valptr, bool is_ssd);
+
+
+
+
+
+__END_DECLS
 
 
 

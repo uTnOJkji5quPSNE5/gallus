@@ -1,14 +1,20 @@
 #ifndef __GALLUS_SESSION_H__
 #define __GALLUS_SESSION_H__
 
-
-
-
-
 /**
  * @file       gallus_session.h
  */
 #include "gallus_ip_addr.h"
+
+
+
+
+
+__BEGIN_DECLS
+
+
+
+
 
 typedef struct session *gallus_session_t;
 
@@ -27,9 +33,6 @@ typedef enum {
   SESSION_UNIX_STREAM = 0x0200,
   SESSION_TLS         = 0x1000,
 } session_type_t;
-
-
-__BEGIN_DECLS
 
 
 /**
@@ -468,10 +471,13 @@ uint64_t
 session_id_get(gallus_session_t s);
 
 
+
+
+
 __END_DECLS
 
 
 
 
 
-#endif /* ! __SESSION_H__ */
+#endif /* __SESSION_H__ */

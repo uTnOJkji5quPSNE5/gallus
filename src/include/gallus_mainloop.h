@@ -13,6 +13,12 @@
 
 
 
+__BEGIN_DECLS
+
+
+
+
+
 /**
  * The signature of the mainloop pre/post-startup hook functions.
  *
@@ -33,9 +39,6 @@ typedef gallus_result_t (*gallus_mainloop_startup_hook_proc_t)(
 
 
 
-
-
-__BEGIN_DECLS
 
 
 /**
@@ -263,10 +266,13 @@ gallus_result_t
 gallus_mainloop_epilogue(shutdown_grace_level_t l, gallus_chrono_t to);
 
 
+
+
+
 __END_DECLS
 
 
 
 
 
-#endif /* ! __GALLUS_MAINLOOP_H__ */
+#endif /* __GALLUS_MAINLOOP_H__ */

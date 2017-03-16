@@ -1,4 +1,4 @@
-.SUFFIXES:	.a .la .ln .o .lo .s .S .c .cc .cpp .i .y .l
+.SUFFIXES:	.a .la .ln .o .lo .s .S .c .cc .cpp .i .y .l .pb.h pb.cc .grpc.pb.h .grpc.pb.cc
 
 .c.o:
 	LC_ALL=C $(CC) $(CFLAGS) $(CPPFLAGS) -c $(srcdir)/$< -o $@
@@ -56,6 +56,24 @@
 
 .l.c:
 	$(LEX) -o $@ $?
+
+ifdef HAVE_PROTOC
+%.pb.cc:	%.proto
+	protoc --cpp_out=$(srcdir) $(srcdir)/$*.proto
+
+%.pb.h:	%.proto
+	protoc --cpp_out=$(srcdir) $(srcdir)/$*.proto
+
+%.grpc.pb.cc:	%.proto
+	protoc --grpc_out=$(srcdir) \
+		--plugin=protoc-gen-grpc=`which grpc_cpp_plugin` \
+		$(srcdir)/$*.proto
+
+%.grpc.pb.h:	%.proto
+	protoc --grpc_out=$(srcdir) \
+		--plugin=protoc-gen-grpc=`which grpc_cpp_plugin` \
+		$(srcdir)/$*.proto
+endif
 
 all::		ALL
 ALL::		symlink $(TARGETS)
@@ -124,12 +142,60 @@ install-header::
 	@true
 endif
 
+ifdef INSTALL_CONFIG_TARGETS
+install::	install-config
+install-config::	$(INSTALL_CONFIG_TARGETS)
+	@if test ! -z "$(INSTALL_CONFIG_TARGETS)" -a \
+		 ! -z "$(INSTALL_CONFIG_DIR)" ; then \
+		$(MKDIR) $(INSTALL_CONFIG_DIR) > /dev/null 2>&1 ; \
+		for i in $(INSTALL_CONFIG_TARGETS) ; do \
+			$(INSTALL_DATA) $$i $(INSTALL_CONFIG_DIR) ; \
+		done ; \
+	fi
+else
+install::	install-config
+install-config::
+	@true
+endif
+
+ifdef INSTALL_DOC_TARGETS
+install::	install-doc
+install-doc::	$(INSTALL_DOC_TARGETS)
+	@if test ! -z "$(INSTALL_DOC_TARGETS)" -a \
+		 ! -z "$(INSTALL_DOC_DIR)" ; then \
+		$(MKDIR) $(INSTALL_DOC_DIR) > /dev/null 2>&1 ; \
+		for i in $(INSTALL_DOC_TARGETS) ; do \
+			$(INSTALL_DATA) $$i $(INSTALL_DOC_DIR) ; \
+		done ; \
+	fi
+else
+install::	install-doc
+install-doc::
+	@true
+endif
+
+ifdef INSTALL_EXAMPLE_TARGETS
+install::	install-example
+install-example::	$(INSTALL_EXAMPLE_TARGETS)
+	@if test ! -z "$(INSTALL_EXAMPLE_TARGETS)" -a \
+		 ! -z "$(INSTALL_EXAMPLE_DIR)" ; then \
+		$(MKDIR) $(INSTALL_EXAMPLE_DIR) > /dev/null 2>&1 ; \
+		for i in $(INSTALL_EXAMPLE_TARGETS) ; do \
+			$(INSTALL_DATA) $$i $(INSTALL_EXAMPLE_DIR) ; \
+		done ; \
+	fi
+else
+install::	install-example
+install-example::
+	@true
+endif
+
 ifdef SRCS
 depend:: symlink generate
 	@if test ! -z "$(SRCS)" -a -z "$(TESTS)" -o ! -z "$(HAVE_UNITY)" ; then \
 		> .depend ; \
-		$(CC) -M $(CPPFLAGS) $(SRCS) | sed 's:\.o\::\.lo\::' \
-		> .depend ; \
+		$(CXX) -std=gnu++11 -M $(CPPFLAGS) $(SRCS) | \
+			sed 's:\.o\::\.lo\::' > .depend ; \
 		if test $$? -ne 0 ; then \
 			echo depend in `pwd` failed. ; \
 		else \
@@ -165,13 +231,13 @@ endif	# SYMLINK
 
 ifdef TARGET_LIB
 $(TARGET_LIB):	$(OBJS)
-	$(LTCLEAN) $@
+	$(RM) -f $@ .libs/$(@F:.la=.*)
 	$(LTLIB_CC) -o $@ $(OBJS) $(LDFLAGS) $(DEP_LIBS)
 endif
 
 ifdef TARGET_EXE
 $(TARGET_EXE):	$(OBJS)
-	$(LTCLEAN) $@
+	$(RM) -f $@ .libs/lt-$@ .libs/$@
 	$(LTLINK_CC) -o $@ $(OBJS) $(DEP_LIBS) $(LDFLAGS) 
 endif
 
@@ -205,6 +271,11 @@ distclean::	clean symlink-clean
 symlink-clean::
 	@find ./ -type l | xargs ${RM}
 
+beautify-for-py::
+	@find . -type f -name '*.py' -o -name '*.py.in'| \
+	egrep -v 'src/wip-or-deprecate|test/AutomaticVerificationTool' | \
+	xargs sh $(MKRULESDIR)/beautify_for_py
+
 beautify:: beautify-for-py
 	@sh $(MKRULESDIR)/beautify 'src/*.c' 'src/*.cpp' 'src/*.h'
 
@@ -225,6 +296,10 @@ libtool::	$(LIBTOOL_DEPS)
 			$(RM) config.log) ; \
 	fi
 endif
+
+.PHONY: check-syntax
+check-syntax:
+	${CC} -Wall -fsyntax-only $(CHK_SOURCES)
 
 doxygen::
 	sh $(MKRULESDIR)/mkfiles.sh
@@ -378,6 +453,12 @@ warn-blame::
 dostext::
 	sh $(MKRULESDIR)/doDosText.sh
 
+check-srcs::
+	@echo $(SRCS)
+
+check-objs::
+	@echo $(OBJS)
+
 summary::
 	@ if test `pwd` == $(TOPDIR) ; then\
 		mkdir -p $(TEST_RESULT_DIR); \
@@ -393,8 +474,8 @@ all depend clean distclean check check-nocolor valgrind helgrind install install
 	done
 endif
 
-summary:: check-nocolor
-	@if test `pwd` = $(TOPDIR) ; then\
+summary:: #check-nocolor
+#	@if test `pwd` = $(TOPDIR) ; then\
 		cd $(TEST_RESULT_DIR) ; \
 		$(RUBY) $(UNITY_SUMMARY) ; \
 		cd $(TOPDIR); \
@@ -430,7 +511,7 @@ $(DEP_UNITY_LIB)::
 depend::
 	@for i in $(TESTS) ; do \
 		echo "$${i}:$${i}.lo $${i}_runner.lo \$$(TEST_DEPS) \$$(DEP_UNITY_LIB)" >> .depend; \
-		echo '	$$(LTCLEAN) $$@' >> .depend; \
+		echo '	$$(RM) -f $$@ .libs/lt-$$@ .libs/$$@' >> .depend; \
 		echo '	$$(LTLINK_CC) -o $$@ $$^ $$(DEP_LIBS) $$(LDFLAGS)' >> .depend; \
 	done
 

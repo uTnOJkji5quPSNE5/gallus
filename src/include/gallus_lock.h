@@ -13,6 +13,12 @@
 
 
 
+__BEGIN_DECLS
+
+
+
+
+
 typedef enum {
   GALLUS_MUTEX_TYPE_UNKNOWN = 0,
   GALLUS_MUTEX_TYPE_DEFAULT,
@@ -29,9 +35,6 @@ typedef struct gallus_barrier_record 	*gallus_barrier_t;
 
 
 
-
-
-__BEGIN_DECLS
 
 
 gallus_result_t
@@ -151,7 +154,111 @@ gallus_result_t
 gallus_barrier_wait(gallus_barrier_t *bptr, bool *is_master);
 
 
+
+
+
+typedef pthread_spinlock_t gallus_spinlock_t;
+
+
+static inline gallus_result_t
+gallus_spinlock_initialize(gallus_spinlock_t *l) {
+  gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
+
+  if (likely(l != NULL)) {
+    int st;
+    errno = 0;
+    if (likely((st = pthread_spin_init(l, PTHREAD_PROCESS_PRIVATE)) == 0)) {
+      ret = GALLUS_RESULT_OK;
+    } else {
+      errno = st;
+      ret = GALLUS_RESULT_POSIX_API_ERROR;
+    }
+  } else {
+    ret = GALLUS_RESULT_INVALID_ARGS;
+  }
+
+  return ret;
+}
+
+
+static inline gallus_result_t
+gallus_spinlock_lock(gallus_spinlock_t *l) {
+  gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
+
+  if (likely(l != NULL)) {
+    int st;
+    errno = 0;
+    if (likely((st = pthread_spin_lock(l) == 0))) {
+      ret = GALLUS_RESULT_OK;
+    } else {
+      errno = st;
+      ret = GALLUS_RESULT_POSIX_API_ERROR;
+    }
+  } else {
+    ret = GALLUS_RESULT_INVALID_ARGS;
+  }
+
+  return ret;
+}
+
+
+static inline gallus_result_t
+gallus_spinlock_trylock(gallus_spinlock_t *l) {
+  gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
+
+  if (likely(l != NULL)) {
+    int st;
+    errno = 0;
+    if (likely((st = pthread_spin_trylock(l) == 0))) {
+      ret = GALLUS_RESULT_OK;
+    } else {
+      errno = st;
+      ret = GALLUS_RESULT_POSIX_API_ERROR;
+    }
+  } else {
+    ret = GALLUS_RESULT_INVALID_ARGS;
+  }
+
+  return ret;
+}
+
+
+static inline gallus_result_t
+gallus_spinlock_unlock(gallus_spinlock_t *l) {
+  gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
+
+  if (likely(l != NULL)) {
+    int st;
+    errno = 0;
+    if (likely((st = pthread_spin_unlock(l) == 0))) {
+      ret = GALLUS_RESULT_OK;
+    } else {
+      errno = st;
+      ret = GALLUS_RESULT_POSIX_API_ERROR;
+    }
+  } else {
+    ret = GALLUS_RESULT_INVALID_ARGS;
+  }
+
+  return ret;
+}
+
+
+static inline void
+gallus_spinlock_finalize(gallus_spinlock_t *l) {
+  if (likely(l != NULL)) {
+    (void)pthread_spin_destroy(l);
+  }
+}
+
+
+
+
+
 __END_DECLS
 
 
-#endif /* ! __GALLUS_LOCK_H__ */
+
+
+
+#endif /* __GALLUS_LOCK_H__ */

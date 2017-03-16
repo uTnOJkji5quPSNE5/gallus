@@ -272,4 +272,4 @@ typedef void
 
 
 
-#endif /* ! __GALLUS_PIPELINE_STAGE_FUNCS_H__ */
+#endif /* __GALLUS_PIPELINE_STAGE_FUNCS_H__ */

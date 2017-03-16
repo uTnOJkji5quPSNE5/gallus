@@ -16,6 +16,9 @@
 __BEGIN_DECLS
 
 
+
+
+
 gallus_result_t
 gallus_str_tokenize_with_limit(char *buf, char **tokens,
                                 size_t max, size_t limit, const char *delm);
@@ -119,7 +122,13 @@ gallus_result_t
 gallus_str_indexof(const char *str1, const char *str2);
 
 
+
+
+
 __END_DECLS
+
+
+
 
 
 #endif /* ! __GALLUS_STRUTILS_H__ */

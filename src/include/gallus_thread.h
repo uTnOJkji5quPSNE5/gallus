@@ -23,6 +23,12 @@
 
 
 
+__BEGIN_DECLS
+
+
+
+
+
 typedef struct gallus_thread_record 	*gallus_thread_t;
 
 
@@ -65,10 +71,6 @@ typedef gallus_result_t
 
 
 
-
-
-__BEGIN_DECLS
-
 
 /**
  * Create a thread.
@@ -405,6 +407,9 @@ gallus_thread_module_initialize(void);
  */
 void
 gallus_thread_module_finalize(void);
+
+
+
 
 
 __END_DECLS

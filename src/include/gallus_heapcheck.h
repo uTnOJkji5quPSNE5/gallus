@@ -8,6 +8,9 @@
 __BEGIN_DECLS
 
 
+
+
+
 void
 gallus_heapcheck_module_initialize(void);
 
@@ -18,6 +21,9 @@ gallus_heapcheck_is_in_heap(const void *addr);
 bool
 gallus_heapcheck_is_mallocd(const void *addr);
 #endif
+
+
+
 
 
 __END_DECLS

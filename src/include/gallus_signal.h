@@ -13,6 +13,12 @@
 
 
 
+__BEGIN_DECLS
+
+
+
+
+
 #ifdef __FreeBSD__
 #define sighandler_t sig_t
 #endif /* __FreeBSD__ */
@@ -27,9 +33,6 @@ typedef void (*sighandler_t)(int);
 
 
 
-__BEGIN_DECLS
-
-
 void	__s_I_g_C_u_R__(int sig);
 
 
@@ -40,8 +43,8 @@ void	__s_I_g_C_u_R__(int sig);
  * A MT-Safe signal(2).
  *
  *	@param[in]	signum	A signal.
- *	@param[in]	new	A new signal handler.
- *	@param[out]	oldptr	A pointer to the current/old handler.
+ *	@param[in]	newhdlr	A new signal handler.
+ *	@param[out]	oldhdlrptr	A pointer to the current/old handler.
  *
  *	@retval	GALLUS_RSULT_OK		Succeeded.
  *	@retval GALLUS_RESULT_INVALID_ARGS	Failed, invalid args.
@@ -49,11 +52,11 @@ void	__s_I_g_C_u_R__(int sig);
  *	@retval GALLUS_RESULT_POSIX_API_ERROR	Failed, POSIX error.
  *	@retval GALLUS_RESULT_ANY_FAILURES	Failed.
  *
- *	@details if the \b new is \b SIG_CUR, the API just returns the
+ *	@details if the \b newhdlr is \b SIG_CUR, the API just returns the
  *	old signal handler to \b *oldptr.
  */
 gallus_result_t
-gallus_signal(int signum, sighandler_t new, sighandler_t *oldptr);
+gallus_signal(int signum, sighandler_t newhdlr, sighandler_t *oldhdlrptr);
 
 
 /**
@@ -61,6 +64,9 @@ gallus_signal(int signum, sighandler_t new, sighandler_t *oldptr);
  * semantics.
  */
 void	gallus_signal_old_school_semantics(void);
+
+
+
 
 
 __END_DECLS

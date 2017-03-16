@@ -13,6 +13,12 @@
 
 
 
+__BEGIN_DECLS
+
+
+
+
+
 typedef enum {
   GLOBAL_STATE_UNKNOWN = 0,
   GLOBAL_STATE_INITIALIZING,
@@ -46,9 +52,6 @@ typedef enum {
 
 
 
-
-
-__BEGIN_DECLS
 
 
 /**
@@ -175,10 +178,13 @@ void	global_state_cancel_janitor(void);
 void	global_state_reset(void);
 
 
+
+
+
 __END_DECLS
 
 
 
 
 
-#endif /* ! __GALLUS_GSTATE_H__ */
+#endif /* __GALLUS_GSTATE_H__ */

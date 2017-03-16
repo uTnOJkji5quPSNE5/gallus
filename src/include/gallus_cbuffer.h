@@ -18,6 +18,15 @@ typedef struct gallus_cbuffer_record 	*gallus_cbuffer_t;
 #endif /* ! __GALLUS_CBUFFER_T_DEFINED__ */
 
 
+
+
+
+__BEGIN_DECLS
+
+
+
+
+
 /**
  * @details The signature of value free up functions called when
  * destroying a circular buffer.
@@ -28,18 +37,11 @@ typedef void	(*gallus_cbuffer_value_freeup_proc_t)(void **valptr);
 
 
 
-__BEGIN_DECLS
-
-
 gallus_result_t
 gallus_cbuffer_create_with_size(gallus_cbuffer_t *cbptr,
                                  size_t elemsize,
                                  int64_t maxelems,
                                  gallus_cbuffer_value_freeup_proc_t proc);
-
-__END_DECLS
-
-
 /**
  * Create a circular buffer.
  *
@@ -54,9 +56,6 @@ __END_DECLS
  */
 #define gallus_cbuffer_create(cbptr, type, maxelems, proc)              \
   gallus_cbuffer_create_with_size((cbptr), sizeof(type), (maxelems), (proc))
-
-
-__BEGIN_DECLS
 
 
 /**
@@ -514,6 +513,9 @@ gallus_cbuffer_is_operational(gallus_cbuffer_t *cbptr, bool *retptr);
  */
 void
 gallus_cbuffer_cancel_janitor(gallus_cbuffer_t *cbptr);
+
+
+
 
 
 __END_DECLS
