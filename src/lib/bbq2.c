@@ -19,7 +19,7 @@ typedef enum {
 typedef struct {
   bool m_done;
   size_t m_seq;
-  size_t m_n_add;
+  size_t m_n_amount;
 } memcpy_result_t;
 
 
@@ -44,9 +44,14 @@ typedef struct gallus_bbq2_record {
 
   volatile size_t m_cur_put_seq;
   volatile size_t m_done_put_seq;
-  size_t m_n_max_putters;
-  memcpy_result_t *m_put_results;
 
+  volatile size_t m_cur_get_seq;
+  volatile size_t m_done_get_seq;
+
+  size_t m_n_max_threads;
+  memcpy_result_t *m_put_results;
+  memcpy_result_t *m_get_results;
+  
   volatile size_t m_n_get_waiters;
   volatile size_t m_n_put_waiters;
 
@@ -158,11 +163,15 @@ s_clean(gallus_bbq2_t q, bool free_values, bool do_wake) {
     (void)memset((void *)(q->m_data), 0,
                  q->m_element_size * q->m_n_max_elements);
     (void)memset((void *)(q->m_put_results), 0,
-                 sizeof(memcpy_result_t) * q->m_n_max_putters);
+                 sizeof(memcpy_result_t) * q->m_n_max_threads);
+    (void)memset((void *)(q->m_get_results), 0,
+                 sizeof(memcpy_result_t) * q->m_n_max_threads);
     q->m_n_elements = 0;
     q->m_n_elements_temp = 0;
     q->m_cur_put_seq = 0;
     q->m_done_put_seq = 0;
+    q->m_cur_get_seq = 0;
+    q->m_done_get_seq = 0;
     q->m_n_get_waiters = 0;
     q->m_n_put_waiters = 0;
     q->m_is_operational = true;
@@ -184,6 +193,30 @@ s_shutdown(gallus_bbq2_t q, bool free_values) {
 }
 
 
+
+
+
+static inline void
+s_do_copyin(gallus_bbq2_t q, uint64_t my_w_idx, void *buf, size_t max_n) {
+  uint64_t idx = my_w_idx % q->m_n_max_elements;
+  char *dst = q->m_data + idx * q->m_element_size;
+
+  if (likely((idx + max_n) <= q->m_n_max_elements)) {
+    (void)memcpy((void *)dst, buf,
+                   (size_t)max_n * q->m_element_size);
+  } else {
+    size_t max_n_0 = q->m_n_max_elements - idx;
+    size_t max_n_0_sz = (size_t)max_n_0 * q->m_element_size;
+    char *src1 = (char *)buf + max_n_0_sz;
+    size_t max_n_1 = max_n - max_n_0;
+
+    (void)memcpy((void *)dst, buf, max_n_0_sz);
+    (void)memcpy((void *)(q->m_data), (void *)src1,
+                   max_n_1 * q->m_element_size);
+  }
+}
+
+
 static inline size_t
 s_copyin(gallus_bbq2_t q, void *buf, size_t n) {
   size_t max_rooms;
@@ -192,73 +225,81 @@ s_copyin(gallus_bbq2_t q, void *buf, size_t n) {
   size_t my_put_seq;
   size_t copy_remains;
   int64_t i;
-  size_t post_scan_idx;
-  size_t idx;
-  char *dst;
-  
-  s_spinlock(q);
-  {
-    mbar();
+  size_t seq_idx;
+  uint64_t idx;
 
-    max_rooms = q->m_n_max_elements - q->m_n_elements_temp;
-    max_n = (max_rooms < n) ? max_rooms : n;
+  mbar();
 
-    if (likely(max_n > 0)) {
-      my_w_idx = q->m_w_idx;
-      q->m_w_idx += max_n;
-      q->m_n_elements_temp += max_n;
-      my_put_seq = q->m_cur_put_seq;
-      q->m_cur_put_seq++;
-
-      mbar();
-    }
-  }
-  s_spinunlock(q);
+  /*
+   * First calculate copiable amount.
+   */
+  max_rooms = q->m_n_max_elements - q->m_n_elements_temp;
+  max_n = (max_rooms < n) ? max_rooms : n;
 
   if (likely(max_n > 0)) {
-    /*
-     * Copy the buf into the queue.
-     */
-    idx = my_w_idx % q->m_n_max_elements;
-    dst = q->m_data + idx * q->m_element_size;
-    post_scan_idx = my_put_seq % q->m_n_max_putters;
-
-    q->m_put_results[post_scan_idx].m_done = false;
-    q->m_put_results[post_scan_idx].m_seq = my_put_seq;
-    q->m_put_results[post_scan_idx].m_n_add = max_n;
-
-    if (likely((idx + max_n) <= q->m_n_max_elements)) {
-      (void)memcpy((void *)dst, buf,
-                   (size_t)max_n * q->m_element_size);
-    } else {
-      size_t max_n_0 = q->m_n_max_elements - idx;
-      size_t max_n_0_sz = (size_t)max_n_0 * q->m_element_size;
-      char *src1 = (char *)buf + max_n_0_sz;
-      size_t max_n_1 = max_n - max_n_0;
-
-      (void)memcpy((void *)dst, buf, max_n_0_sz);
-      (void)memcpy((void *)(q->m_data), (void *)src1,
-                   max_n_1 * q->m_element_size);
-    }
-
-    q->m_put_results[post_scan_idx].m_done = false;
 
     s_spinlock(q);
     {
       /*
-       * We could have unaccumulated memcpy result. Scan and accumulate.
+       * And if it is greater than zero:
+       *	1) decide write index for this thread.
+       *	2) update the index by the amount.
+       *	3) acquire a put ticket (my_put_seq) for this thread.
+       *	4) update the global put ticket for this buffer.
+       *	5) update temp. sum in this buffer.
        */
-      mbar();
+      my_w_idx = q->m_w_idx;
+      q->m_w_idx += max_n;
+      my_put_seq = q->m_cur_put_seq;
+      q->m_cur_put_seq++;
+      q->m_n_elements_temp += max_n;
 
+      mbar();
+    }
+    s_spinunlock(q);
+
+    /*
+     * Acquire a "slot" to store following memcpy()s' result/side effect
+     * and store them into the slot.
+     */
+    seq_idx = my_put_seq % q->m_n_max_threads;
+    q->m_put_results[seq_idx].m_done = false;
+    q->m_put_results[seq_idx].m_seq = my_put_seq;
+    q->m_put_results[seq_idx].m_n_amount = max_n;
+  
+    /*
+     * Copy the buf into the queue.
+     */
+    s_do_copyin(q, my_w_idx, buf, max_n);
+
+    /*
+     * Update the memcpy() state.
+     */
+    q->m_put_results[seq_idx].m_done = true;
+
+    s_spinlock(q);
+    {
+      /*
+       * Determine how many memcpy() not yet be checked, as maximum.
+       */
       copy_remains = my_put_seq - q->m_done_put_seq;
 
+      /*
+       * Scan the memcpy() results in chronological order of the
+       * sequence #.
+       */
       for (i = (int64_t)copy_remains; i >= 0; i--) {
-        idx = (post_scan_idx + q->m_n_max_putters - (size_t)i) %
-              q->m_n_max_putters;
+        idx = (seq_idx + q->m_n_max_threads - (size_t)i) % q->m_n_max_threads;
         if (q->m_put_results[idx].m_done == true) {
+          /*
+           * If the memcpy() which sequence # is younger than this is
+           * done then:
+           *	1) update the maximum sequence # which is done.
+           *	2) accumulate amount which copied by the memcpy(),
+           *	   into the global sum.
+           */
           q->m_done_put_seq = q->m_put_results[idx].m_seq;
-          (void)__sync_add_and_fetch(&(q->m_n_elements),
-                                     q->m_put_results[idx].m_n_add);
+          q->m_n_elements += q->m_put_results[idx].m_n_amount;
         } else {
           /*
            * memcpy that sequence # is younger than this still
@@ -271,6 +312,8 @@ s_copyin(gallus_bbq2_t q, void *buf, size_t n) {
  unlock:
     s_spinunlock(q);
 
+    mbar();
+
     /*
      * And wake all the getters.
      */
@@ -281,54 +324,140 @@ s_copyin(gallus_bbq2_t q, void *buf, size_t n) {
 }
 
 
+static inline void
+s_do_copyout(gallus_bbq2_t q, uint64_t my_r_idx, void *buf, size_t max_n) {
+  uint64_t idx =  my_r_idx % q->m_n_max_elements;
+  char *src = q->m_data + idx * q->m_element_size;
+
+  if (likely((idx + max_n) <= q->m_n_max_elements)) {
+    (void)memcpy(buf, (void *)src, max_n * q->m_element_size);
+  } else {
+    size_t max_n_0 = q->m_n_max_elements - idx;
+    size_t max_n_0_sz = (size_t)max_n_0 * q->m_element_size;
+    char *dst1 = (char *)buf + max_n_0_sz;
+    size_t max_n_1 = max_n - max_n_0;
+
+    (void)memcpy(buf, (void *)src, max_n_0_sz);
+    (void)memcpy((void *)dst1, (void *)(q->m_data),
+                 max_n_1 * q->m_element_size);
+  }
+}
+
+
 static inline size_t
 s_copyout(gallus_bbq2_t q, void *buf, size_t n, bool do_incr) {
-  size_t my_r_idx;
+  size_t max_elem;
+  size_t max_n;
+  uint64_t my_r_idx;
+  size_t my_get_seq;
+  size_t copy_remains;
+  int64_t i;
+  size_t seq_idx;
   size_t idx;
-  char *src;
-  size_t max_elem = __sync_fetch_and_add(&(q->m_n_elements), 0);
-  size_t max_n = (n < max_elem) ? n : max_elem;
-  
+
+  mbar();
+
+  /*
+   * First calculate copiable amount.
+   */
+  max_elem = q->m_n_elements;
+  max_n = (n < max_elem) ? n : max_elem;
+
   if (likely(max_n > 0)) {
-    /*
-     * Copy to buf from the queue.
-     */
-
-    s_spinlock(q);
-    {
-      mbar();
-
-      my_r_idx = q->m_r_idx;
-
-      if (likely(do_incr == true)) {
-        q->m_r_idx += max_n;
-        q->m_n_elements_temp -= max_n;
-        (void)__sync_sub_and_fetch(&(q->m_n_elements), max_n);
-      }
-    }
-    s_spinunlock(q);
-
-    idx =  my_r_idx % q->m_n_max_elements;
-    src = q->m_data + idx * q->m_element_size;
-
-    if (likely((idx + max_n) <= q->m_n_max_elements)) {
-      (void)memcpy(buf, (void *)src, max_n * q->m_element_size);
-    } else {
-      size_t max_n_0 = q->m_n_max_elements - idx;
-      size_t max_n_0_sz = (size_t)max_n_0 * q->m_element_size;
-      char *dst1 = (char *)buf + max_n_0_sz;
-      size_t max_n_1 = max_n - max_n_0;
-
-      (void)memcpy(buf, (void *)src, max_n_0_sz);
-      (void)memcpy((void *)dst1, (void *)(q->m_data),
-                   max_n_1 * q->m_element_size);
-    }
 
     if (likely(do_incr == true)) {
+
+      s_spinlock(q);
+      {
+        /*
+         * And ic it is greater than zero:
+         *	1) decide read index for this thread.
+         *	2) update the index by the amount.
+         *	3) acquire a get ticket (my_get_seq) for this thread.
+         *	4) update the global get ticket for this buffer.
+         *	5) update global sum in this buffer.
+         */
+        my_r_idx = q->m_r_idx;
+        q->m_r_idx += max_n;
+        my_get_seq = q->m_cur_get_seq;
+        q->m_cur_get_seq++;
+        q->m_n_elements -= max_n;
+
+        mbar();
+      }
+      s_spinunlock(q);
+
+      /*
+       * Acquire a "slot" to store following memcpy()s' result/side effect
+       * and store them into the slot.
+       */
+      seq_idx = my_get_seq % q->m_n_max_threads;
+      q->m_get_results[seq_idx].m_done = false;
+      q->m_get_results[seq_idx].m_seq = my_get_seq;
+      q->m_get_results[seq_idx].m_n_amount = max_n;
+
+      /*
+       * Copy the queue contents to the buf.
+       */
+      s_do_copyout(q, my_r_idx, buf, max_n);
+
+      /*
+       * Update the memcpy() state.
+       */
+      q->m_get_results[seq_idx].m_done = true;
+
+      s_spinlock(q);
+      {
+        /*
+         * Determine how many memcpy() not yet be checked, as maximum.
+         */
+        copy_remains = my_get_seq - q->m_done_get_seq;
+
+        /*
+         * Scan the memcpy() results in chronological order of the
+         * sequence #.
+         */
+        for (i = (int64_t)copy_remains; i >= 0; i--) {
+          idx = (seq_idx + q->m_n_max_threads - (size_t)i) %
+                q->m_n_max_threads;
+          if (q->m_get_results[idx].m_done == true) {
+            /*
+             * If the memcpy() which sequence # is younger than this is
+             * done then:
+             *	1) update the maximum sequence # which is done.
+             *	2) accumulate amount which copied by the memcpy(),
+             *	   into the temp. sum.
+             */
+            q->m_done_get_seq = q->m_get_results[idx].m_seq;
+            q->m_n_elements_temp -= q->m_get_results[idx].m_n_amount;
+          } else {
+            /*
+             * memcpy that sequence # is younger than this still
+             * running. Just leave it alone for now.
+             */
+            goto unlock;
+          }
+        }
+      }
+   unlock:
+      s_spinunlock(q);
+
+      mbar();
+
       /*
        * And wake all the putters.
        */
       (void)gallus_cond_notify(&(q->m_put_cond), true);
+
+    } else {
+
+      s_spinlock(q);
+      {
+        my_r_idx = q->m_r_idx;
+      }
+      s_spinunlock(q);
+
+      s_do_copyout(q, my_r_idx, buf, max_n);
     }
   }
 
@@ -384,8 +513,7 @@ s_wait_io_ready(gallus_bbq2_t q,
          * waiters are awakened and leave this function.
          */
         if (likely(q->m_is_operational == true)) {
-          n_waiters = __sync_fetch_and_add(&(q->m_n_put_waiters), 0);
-          n_waiters += __sync_fetch_and_add(&(q->m_n_get_waiters), 0);
+          n_waiters = q->m_n_put_waiters + q->m_n_get_waiters;
           if (n_waiters == 0) {
 
             /*
@@ -801,7 +929,7 @@ s_bbq2_create(gallus_bbq2_t *qptr,
         q->m_numa_node = numa_node;
         q->m_n_max_elements = maxelems;
         q->m_element_size = elemsize;
-        q->m_n_max_putters = maxthd;
+        q->m_n_max_threads = maxthd;
         q->m_del_proc = proc;
         q->m_put_results = res;
         
@@ -905,9 +1033,7 @@ s_bbq2_wakeup(gallus_bbq2_t *qptr, gallus_chrono_t nsec) {
              *qptr != NULL)) {
     size_t n_waiters;
 
-    n_waiters = __sync_fetch_and_add(&((*qptr)->m_n_put_waiters), 0);
-    n_waiters += __sync_fetch_and_add(&((*qptr)->m_n_get_waiters), 0);
-
+    n_waiters = (*qptr)->m_n_put_waiters + (*qptr)->m_n_get_waiters;
     if (n_waiters > 0) {
 
       (void)gallus_mutex_lock(&((*qptr)->m_muxlock));
@@ -978,14 +1104,14 @@ s_bbq2_wait_gettable(gallus_bbq2_t *qptr,
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
   
   if (likely(qptr != NULL && *qptr != NULL)) {
-    size_t n_elem = __sync_fetch_and_add(&((*qptr)->m_n_elements), 0);
+    size_t n_elem = (*qptr)->m_n_elements;
 
     if (n_elem > 0) {
       ret = (gallus_result_t)n_elem;
     } else {
       ret = s_wait_gettable(*qptr, nsec);
       if (ret == GALLUS_RESULT_OK) {
-        n_elem = __sync_fetch_and_add(&((*qptr)->m_n_elements), 0);
+        n_elem = (*qptr)->m_n_elements;
         ret = (gallus_result_t)n_elem; 
       }
     }
@@ -1003,15 +1129,13 @@ s_bbq2_wait_puttable(gallus_bbq2_t *qptr,
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (likely(qptr != NULL && *qptr != NULL)) {
-    size_t remains = (*qptr)->m_n_max_elements -
-                     __sync_fetch_and_add(&((*qptr)->m_n_elements), 0);
+    size_t remains = (*qptr)->m_n_max_elements - (*qptr)->m_n_elements;
     if (remains > 0) {
       ret = (gallus_result_t)remains;
     } else {
       ret = s_wait_puttable(*qptr, nsec);
       if (ret == GALLUS_RESULT_OK) {
-        remains = (*qptr)->m_n_max_elements -
-                  __sync_fetch_and_add(&((*qptr)->m_n_elements), 0);
+        remains = (*qptr)->m_n_max_elements - (*qptr)->m_n_elements;
         ret = (gallus_result_t)remains;
       }
     }
@@ -1105,7 +1229,7 @@ s_bbq2_size(gallus_bbq2_t *qptr) {
   if (likely(qptr != NULL &&
              *qptr != NULL)) {
     if (likely((*qptr)->m_is_operational == true)) {
-      ret = (gallus_result_t)__sync_fetch_and_add(&((*qptr)->m_n_elements), 0);
+      ret = (gallus_result_t)(*qptr)->m_n_elements;
     } else {
       ret = GALLUS_RESULT_NOT_OPERATIONAL;
     }
@@ -1125,8 +1249,7 @@ s_bbq2_remaining_capacity(gallus_bbq2_t *qptr) {
              *qptr != NULL)) {
     if (likely((*qptr)->m_is_operational == true)) {
       ret = (gallus_result_t)
-            ((*qptr)->m_n_max_elements -
-             __sync_fetch_and_add(&((*qptr)->m_n_elements), 0));
+            ((*qptr)->m_n_max_elements - (*qptr)->m_n_elements);
     } else {
       ret = GALLUS_RESULT_NOT_OPERATIONAL;
     }
@@ -1166,8 +1289,8 @@ s_bbq2_is_full(gallus_bbq2_t *qptr, bool *retptr) {
              retptr != NULL)) {
     *retptr = false;
     if (likely((*qptr)->m_is_operational == true)) {
-      *retptr = (__sync_fetch_and_add(&((*qptr)->m_n_elements), 0) >=
-                 (*qptr)->m_n_max_elements) ? true : false;
+      *retptr = ((*qptr)->m_n_elements >= (*qptr)->m_n_max_elements)
+                ? true : false;
       ret = GALLUS_RESULT_OK;
     } else {
       ret = GALLUS_RESULT_NOT_OPERATIONAL;
@@ -1189,8 +1312,7 @@ s_bbq2_is_empty(gallus_bbq2_t *qptr, bool *retptr) {
              retptr != NULL)) {
     *retptr = false;
     if (likely((*qptr)->m_is_operational == true)) {
-      *retptr = (__sync_fetch_and_add(&((*qptr)->m_n_elements), 0) == 0) ?
-                true : false;
+      *retptr = ((*qptr)->m_n_elements == 0) ? true : false;
       ret = GALLUS_RESULT_OK;
     } else {
       ret = GALLUS_RESULT_NOT_OPERATIONAL;
