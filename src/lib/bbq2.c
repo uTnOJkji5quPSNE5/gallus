@@ -319,17 +319,16 @@ s_copyin(gallus_bbq2_t q, void *buf, size_t n) {
   uint64_t idx;
   int do_flush;
 
-  /*
-   * First calculate copiable amount.
-   */
-  max_rooms = q->m_n_max_elements - q->m_n_elements_temp;
-  max_n = (max_rooms < n) ? max_rooms : n;
+  s_spinlock(q);
+  {
 
-  if (likely(max_n > 0)) {
+    /*
+     * First calculate copiable amount.
+     */
+    max_rooms = q->m_n_max_elements - q->m_n_elements_temp;
+    max_n = (max_rooms < n) ? max_rooms : n;
 
-    s_spinlock(q);
-    {
-
+    if (likely(max_n > 0)) {
       /*
        * And if it is greater than zero:
        *	1) decide write index for this thread.
@@ -343,10 +342,12 @@ s_copyin(gallus_bbq2_t q, void *buf, size_t n) {
       s_increment_temp_amount(q, max_n);	/* 5) */
 
       mbar();
-
     }
-    s_spinunlock(q);
 
+  }
+  s_spinunlock(q);
+    
+  if (likely(max_n > 0)) {
     /*
      * Copy the buf into the queue.
      */
@@ -506,19 +507,18 @@ s_copyout(gallus_bbq2_t q, void *buf, size_t n, bool do_incr) {
   uint64_t idx;
   int do_flush;
 
-  /*
-   * First calculate copiable amount.
-   */
-  max_elem = q->m_n_elements;
-  max_n = (n < max_elem) ? n : max_elem;
+  if (likely(do_incr == true)) {
 
-  if (likely(max_n > 0)) {
+    s_spinlock(q);
+    {
 
-    if (likely(do_incr == true)) {
+      /*
+       * First calculate copiable amount.
+       */
+      max_elem = q->m_n_elements;
+      max_n = (n < max_elem) ? n : max_elem;
 
-      s_spinlock(q);
-      {
-
+      if (likely(max_n > 0)) {
         /*
          * And ic it is greater than zero:
          *	1) decide read index for this thread.
@@ -532,10 +532,12 @@ s_copyout(gallus_bbq2_t q, void *buf, size_t n, bool do_incr) {
         s_decrement_amount(q, max_n);			/* 5) */
 
         mbar();
-
       }
-      s_spinunlock(q);
 
+    }
+    s_spinunlock(q);
+
+    if (likely(max_n > 0)) {    
       /*
        * Copy the queue contents to the buf.
        */
@@ -586,14 +588,25 @@ s_copyout(gallus_bbq2_t q, void *buf, size_t n, bool do_incr) {
        */
       (void)gallus_cond_notify(&(q->m_put_cond), true);
 
-    } else {
+    }
 
-      s_spinlock(q);
-      {
-        my_r_idx = q->m_r_idx;
-      }
-      s_spinunlock(q);
+  } else {
 
+    s_spinlock(q);
+    {
+
+      /*
+       * First calculate copiable amount.
+       */
+      max_elem = q->m_n_elements;
+      max_n = (n < max_elem) ? n : max_elem;
+
+      my_r_idx = q->m_r_idx;
+
+    }
+    s_spinunlock(q);
+
+    if (likely(max_n > 0)) {
       s_do_copyout_pure(q, my_r_idx, buf, max_n);
     }
   }
