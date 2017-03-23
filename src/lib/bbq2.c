@@ -1053,7 +1053,11 @@ s_bbq2_create(gallus_bbq2_t *qptr,
         (gallus_bbq2_t)gallus_malloc_on_numanode(
             sizeof(*q) + elemsize * maxelems,
             numa_node);
-    memcpy_result_t *res =
+    memcpy_result_t *put_res =
+        (memcpy_result_t *)gallus_malloc_on_numanode(
+            sizeof(memcpy_result_t) * maxthd,
+            numa_node);
+    memcpy_result_t *get_res =
         (memcpy_result_t *)gallus_malloc_on_numanode(
             sizeof(memcpy_result_t) * maxthd,
             numa_node);
@@ -1061,7 +1065,8 @@ s_bbq2_create(gallus_bbq2_t *qptr,
     *qptr = NULL;
 
     if (likely(q != NULL &&
-               res != NULL)) {
+               put_res != NULL &&
+               get_res != NULL)) {
       if (likely(((ret = gallus_mutex_create(&(q->m_muxlock))) ==
                   GALLUS_RESULT_OK) &&
                  ((ret = gallus_mutex_create(&(q->m_put_lock))) ==
@@ -1081,8 +1086,9 @@ s_bbq2_create(gallus_bbq2_t *qptr,
         q->m_element_size = elemsize;
         q->m_n_max_threads = maxthd;
         q->m_del_proc = proc;
-        q->m_put_results = res;
-        
+        q->m_put_results = put_res;
+        q->m_get_results = get_res;
+
         s_clean(q, true, false);
 
         *qptr = q;
