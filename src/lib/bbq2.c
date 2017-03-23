@@ -197,6 +197,18 @@ s_shutdown(gallus_bbq2_t q, bool free_values) {
 
 
 static inline void
+s_increment_amount(gallus_bbq2_t q, size_t amount) {
+  q->m_n_elements += amount;
+}
+
+
+static inline void
+s_decrement_amount(gallus_bbq2_t q, size_t amount) {
+  q->m_n_elements -= amount;
+}
+
+
+static inline void
 s_increment_temp_amount(gallus_bbq2_t q, size_t amount) {
   q->m_n_elements_temp += amount;
 }
@@ -234,7 +246,7 @@ s_update_put_sequence(gallus_bbq2_t q) {
 static inline void
 s_accumulate_put_result(gallus_bbq2_t q, uint64_t idx) {
   q->m_done_put_seq = q->m_put_results[idx].m_seq;
-  q->m_n_elements += q->m_put_results[idx].m_n_amount;
+  s_increment_amount(q, q->m_put_results[idx].m_n_amount);
 }
 
 
@@ -305,8 +317,7 @@ s_copyin(gallus_bbq2_t q, void *buf, size_t n) {
   int64_t i;
   uint64_t seq_idx;
   uint64_t idx;
-
-  mbar();
+  int do_flush;
 
   /*
    * First calculate copiable amount.
@@ -318,6 +329,7 @@ s_copyin(gallus_bbq2_t q, void *buf, size_t n) {
 
     s_spinlock(q);
     {
+
       /*
        * And if it is greater than zero:
        *	1) decide write index for this thread.
@@ -331,6 +343,7 @@ s_copyin(gallus_bbq2_t q, void *buf, size_t n) {
       s_increment_temp_amount(q, max_n);	/* 5) */
 
       mbar();
+
     }
     s_spinunlock(q);
 
@@ -341,6 +354,7 @@ s_copyin(gallus_bbq2_t q, void *buf, size_t n) {
 
     s_spinlock(q);
     {
+
       /*
        * Determine how many memcpy() not yet be checked, as maximum.
        */
@@ -350,7 +364,7 @@ s_copyin(gallus_bbq2_t q, void *buf, size_t n) {
        * Scan the memcpy() results in chronological order of the
        * sequence #.
        */
-      for (i = (int64_t)copy_remains; i >= 0; i--) {
+      for (do_flush = 0, i = (int64_t)copy_remains; i >= 0; i--) {
         idx = s_acquire_put_index(q, seq_idx, (uint64_t)i);
         if (s_is_put_done(q, idx) == true) {
           /*
@@ -361,19 +375,22 @@ s_copyin(gallus_bbq2_t q, void *buf, size_t n) {
            *	   into the global sum.
            */
           s_accumulate_put_result(q, idx);	/* 1), 2) */
+          do_flush++;
         } else {
           /*
            * memcpy that sequence # is younger than this still
            * running. Just leave it alone for now.
            */
-          goto unlock;
+          break;
         }
       }
-    }
- unlock:
-    s_spinunlock(q);
 
-    mbar();
+      if (do_flush > 0) {
+        mbar();
+      }
+
+    }
+    s_spinunlock(q);
 
     /*
      * And wake all the getters.
@@ -385,8 +402,39 @@ s_copyin(gallus_bbq2_t q, void *buf, size_t n) {
 }
 
 
+
+
+
+static inline uint64_t
+s_update_get_index(gallus_bbq2_t q, size_t max_n) {
+  uint64_t ret = q->m_r_idx;
+
+  q->m_r_idx += max_n;
+
+  return ret;
+}
+
+
+static inline uint64_t
+s_update_get_sequence(gallus_bbq2_t q) {
+  uint64_t ret = q->m_cur_get_seq;
+
+  q->m_cur_get_seq++;
+
+  return ret;
+}
+
+
 static inline void
-s_do_copyout(gallus_bbq2_t q, uint64_t my_r_idx, void *buf, size_t max_n) {
+s_accumulate_get_result(gallus_bbq2_t q, uint64_t idx) {
+  q->m_done_get_seq = q->m_get_results[idx].m_seq;
+  s_decrement_temp_amount(q, q->m_get_results[idx].m_n_amount);
+}
+
+
+static inline void
+s_do_copyout_pure(gallus_bbq2_t q, uint64_t my_r_idx,
+                  void *buf, size_t max_n) {
   uint64_t idx =  my_r_idx % q->m_n_max_elements;
   char *src = q->m_data + idx * q->m_element_size;
 
@@ -406,17 +454,57 @@ s_do_copyout(gallus_bbq2_t q, uint64_t my_r_idx, void *buf, size_t max_n) {
 
 
 static inline size_t
+s_do_copyout(gallus_bbq2_t q, uint64_t my_r_idx, void *buf, size_t max_n,
+             uint64_t my_get_seq) {
+  /*
+   * Acquire a "slot" to store following memcpy()s' result/side effect
+   * and store them into the slot.
+   */
+  uint64_t seq_idx = my_get_seq % q->m_n_max_threads;
+  q->m_get_results[seq_idx].m_done = false;
+  q->m_get_results[seq_idx].m_seq = my_get_seq;
+  q->m_get_results[seq_idx].m_n_amount = max_n;
+
+  s_do_copyout_pure(q, my_r_idx, buf, max_n);
+
+  /*
+   * Update the memcpy() state.
+   */
+  q->m_get_results[seq_idx].m_done = true;
+
+  return seq_idx;
+}
+
+
+static inline size_t
+s_acquire_get_remains(gallus_bbq2_t q, uint64_t my_get_seq) {
+  return my_get_seq - q->m_done_get_seq;
+}
+
+
+static inline uint64_t
+s_acquire_get_index(gallus_bbq2_t q, uint64_t my_seq_idx, uint64_t relidx) {
+  return (my_seq_idx + q->m_n_max_threads - relidx) % q->m_n_max_threads;
+}
+
+
+static inline bool
+s_is_get_done(gallus_bbq2_t q, uint64_t idx) {
+  return q->m_get_results[idx].m_done;
+}
+
+
+static inline size_t
 s_copyout(gallus_bbq2_t q, void *buf, size_t n, bool do_incr) {
   size_t max_elem;
   size_t max_n;
   uint64_t my_r_idx;
-  size_t my_get_seq;
+  uint64_t my_get_seq;
   size_t copy_remains;
   int64_t i;
-  size_t seq_idx;
-  size_t idx;
-
-  mbar();
+  uint64_t seq_idx;
+  uint64_t idx;
+  int do_flush;
 
   /*
    * First calculate copiable amount.
@@ -430,6 +518,7 @@ s_copyout(gallus_bbq2_t q, void *buf, size_t n, bool do_incr) {
 
       s_spinlock(q);
       {
+
         /*
          * And ic it is greater than zero:
          *	1) decide read index for this thread.
@@ -438,50 +527,35 @@ s_copyout(gallus_bbq2_t q, void *buf, size_t n, bool do_incr) {
          *	4) update the global get ticket for this buffer.
          *	5) update global sum in this buffer.
          */
-        my_r_idx = q->m_r_idx;
-        q->m_r_idx += max_n;
-        my_get_seq = q->m_cur_get_seq;
-        q->m_cur_get_seq++;
-        q->m_n_elements -= max_n;
+        my_r_idx = s_update_get_index(q, max_n);	/* 1), 2) */
+        my_get_seq = s_update_get_sequence(q);		/* 3), 4) */
+        s_decrement_amount(q, max_n);			/* 5) */
 
         mbar();
+
       }
       s_spinunlock(q);
 
       /*
-       * Acquire a "slot" to store following memcpy()s' result/side effect
-       * and store them into the slot.
-       */
-      seq_idx = my_get_seq % q->m_n_max_threads;
-      q->m_get_results[seq_idx].m_done = false;
-      q->m_get_results[seq_idx].m_seq = my_get_seq;
-      q->m_get_results[seq_idx].m_n_amount = max_n;
-
-      /*
        * Copy the queue contents to the buf.
        */
-      s_do_copyout(q, my_r_idx, buf, max_n);
-
-      /*
-       * Update the memcpy() state.
-       */
-      q->m_get_results[seq_idx].m_done = true;
+      seq_idx = s_do_copyout(q, my_r_idx, buf, max_n, my_get_seq);
 
       s_spinlock(q);
       {
+
         /*
          * Determine how many memcpy() not yet be checked, as maximum.
          */
-        copy_remains = my_get_seq - q->m_done_get_seq;
+        copy_remains = s_acquire_get_remains(q, my_get_seq);
 
         /*
          * Scan the memcpy() results in chronological order of the
          * sequence #.
          */
-        for (i = (int64_t)copy_remains; i >= 0; i--) {
-          idx = (seq_idx + q->m_n_max_threads - (size_t)i) %
-                q->m_n_max_threads;
-          if (q->m_get_results[idx].m_done == true) {
+        for (do_flush = 0, i = (int64_t)copy_remains; i >= 0; i--) {
+          idx = s_acquire_put_index(q, seq_idx, (uint64_t)i);
+          if (s_is_get_done(q, idx) == true) {
             /*
              * If the memcpy() which sequence # is younger than this is
              * done then:
@@ -489,21 +563,23 @@ s_copyout(gallus_bbq2_t q, void *buf, size_t n, bool do_incr) {
              *	2) accumulate amount which copied by the memcpy(),
              *	   into the temp. sum.
              */
-            q->m_done_get_seq = q->m_get_results[idx].m_seq;
-            q->m_n_elements_temp -= q->m_get_results[idx].m_n_amount;
+            s_accumulate_get_result(q, idx);	/* 1), 2) */
+            do_flush++;
           } else {
             /*
              * memcpy that sequence # is younger than this still
              * running. Just leave it alone for now.
              */
-            goto unlock;
+            break;
           }
         }
-      }
-   unlock:
-      s_spinunlock(q);
 
-      mbar();
+        if (do_flush > 0) {
+          mbar();
+        }
+
+      }
+      s_spinunlock(q);
 
       /*
        * And wake all the putters.
@@ -518,7 +594,7 @@ s_copyout(gallus_bbq2_t q, void *buf, size_t n, bool do_incr) {
       }
       s_spinunlock(q);
 
-      s_do_copyout(q, my_r_idx, buf, max_n);
+      s_do_copyout_pure(q, my_r_idx, buf, max_n);
     }
   }
 
