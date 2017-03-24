@@ -24,6 +24,7 @@
 #include "gallus_qmuxer.h"
 #include "gallus_cbuffer.h"
 #include "gallus_bbq.h"
+#include "gallus_bbq2.h"
 #include "gallus_signal.h"
 #include "gallus_pipeline_stage.h"
 #include "gallus_module_apis.h"

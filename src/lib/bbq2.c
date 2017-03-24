@@ -4,11 +4,6 @@
 
 
 
-struct gallus_bbq2_record;
-typedef struct gallus_bbq2_record *gallus_bbq2_t;
-typedef void    (*gallus_bbq2_value_freeup_proc_t)(void **valptr);
-
-
 typedef enum {
   wait_unknown = 0,
   wait_put = 1,
@@ -1036,12 +1031,12 @@ s_get_n(gallus_bbq2_t *qptr,
 
 
 
-static inline gallus_result_t
-s_bbq2_create(gallus_bbq2_t *qptr,
-              unsigned int numa_node,
-              size_t elemsize,
-              size_t maxelems,
-              gallus_bbq2_value_freeup_proc_t proc) {
+gallus_result_t
+gallus_bbq2_create(gallus_bbq2_t *qptr,
+                   unsigned int numa_node,
+                   size_t elemsize,
+                   size_t maxelems,
+                   gallus_bbq2_value_freeup_proc_t proc) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (likely(qptr != NULL &&
@@ -1106,9 +1101,8 @@ s_bbq2_create(gallus_bbq2_t *qptr,
 }
 
 
-static inline void
-s_bbq2_shutdown(gallus_bbq2_t *qptr,
-                bool free_values) {
+void
+gallus_bbq2_shutdown(gallus_bbq2_t *qptr, bool free_values) {
   if (likely(qptr != NULL &&
              *qptr != NULL)) {
 
@@ -1122,9 +1116,8 @@ s_bbq2_shutdown(gallus_bbq2_t *qptr,
 }
 
 
-static inline void
-s_bbq2_destroy(gallus_bbq2_t *qptr,
-               bool free_values) {
+void
+gallus_bbq2_destroy(gallus_bbq2_t *qptr, bool free_values) {
   if (likely(qptr != NULL &&
              *qptr != NULL)) {
 
@@ -1155,9 +1148,8 @@ s_bbq2_destroy(gallus_bbq2_t *qptr,
 }
 
 
-static inline gallus_result_t
-s_bbq2_clear(gallus_bbq2_t *qptr,
-                      bool free_values) {
+gallus_result_t
+gallus_bbq2_clear(gallus_bbq2_t *qptr, bool free_values) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (likely(qptr != NULL &&
@@ -1180,8 +1172,8 @@ s_bbq2_clear(gallus_bbq2_t *qptr,
 }
 
 
-static inline gallus_result_t
-s_bbq2_wakeup(gallus_bbq2_t *qptr, gallus_chrono_t nsec) {
+gallus_result_t
+gallus_bbq2_wakeup(gallus_bbq2_t *qptr, gallus_chrono_t nsec) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (likely(qptr != NULL &&
@@ -1253,9 +1245,8 @@ s_bbq2_wakeup(gallus_bbq2_t *qptr, gallus_chrono_t nsec) {
 }
 
 
-static inline gallus_result_t
-s_bbq2_wait_gettable(gallus_bbq2_t *qptr,
-                     gallus_chrono_t nsec) {
+gallus_result_t
+gallus_bbq2_wait_gettable(gallus_bbq2_t *qptr, gallus_chrono_t nsec) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
   
   if (likely(qptr != NULL && *qptr != NULL)) {
@@ -1278,9 +1269,8 @@ s_bbq2_wait_gettable(gallus_bbq2_t *qptr,
 }
 
 
-static inline gallus_result_t
-s_bbq2_wait_puttable(gallus_bbq2_t *qptr,
-                     gallus_chrono_t nsec) {
+gallus_result_t
+gallus_bbq2_wait_puttable(gallus_bbq2_t *qptr, gallus_chrono_t nsec) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (likely(qptr != NULL && *qptr != NULL)) {
@@ -1305,63 +1295,63 @@ s_bbq2_wait_puttable(gallus_bbq2_t *qptr,
 
 
 
-static inline gallus_result_t
-s_bbq2_put(gallus_bbq2_t *qptr,
-           void **valptr,
-           size_t valsz,
-           gallus_chrono_t nsec) {
+gallus_result_t
+gallus_bbq2_put(gallus_bbq2_t *qptr,
+                void **valptr,
+                size_t valsz,
+                gallus_chrono_t nsec) {
   gallus_result_t n = s_put_n(qptr, (void *)valptr, 1LL, valsz, nsec, NULL);
   return (n == 1LL) ? GALLUS_RESULT_OK : n;
 }
 
 
-static inline gallus_result_t
-s_bbq2_put_n(gallus_bbq2_t *qptr,
-             void **valptr,
-             size_t n_vals,
-             size_t valsz,
-             gallus_chrono_t nsec,
-             size_t *n_actual_put) {
+gallus_result_t
+gallus_bbq2_put_n(gallus_bbq2_t *qptr,
+                  void **valptr,
+                  size_t n_vals,
+                  size_t valsz,
+                  gallus_chrono_t nsec,
+                  size_t *n_actual_put) {
   return s_put_n(qptr, (void *)valptr, n_vals, valsz, nsec, n_actual_put);
 }
 
 
-static inline gallus_result_t
-s_bbq2_get(gallus_bbq2_t *qptr,
-           void **valptr,
-           size_t valsz,
-           gallus_chrono_t nsec) {
+gallus_result_t
+gallus_bbq2_get(gallus_bbq2_t *qptr,
+                void **valptr,
+                size_t valsz,
+                gallus_chrono_t nsec) {
   gallus_result_t n = s_get_n(qptr, (void *)valptr, 1LL, 1LL,
                               valsz, nsec, NULL, true);
   return (n == 1LL) ? GALLUS_RESULT_OK : n;
 }
 
 
-static inline gallus_result_t
-s_bbq2_get_n(gallus_bbq2_t *qptr,
-             void **valptr,
-             size_t n_vals_max,
-             size_t n_at_least,
-             size_t valsz,
-             gallus_chrono_t nsec,
-             size_t *n_actual_get) {
+gallus_result_t
+gallus_bbq2_get_n(gallus_bbq2_t *qptr,
+                  void **valptr,
+                  size_t n_vals_max,
+                  size_t n_at_least,
+                  size_t valsz,
+                  gallus_chrono_t nsec,
+                  size_t *n_actual_get) {
   return s_get_n(qptr, (void *)valptr, n_vals_max, n_at_least,
                  valsz, nsec, n_actual_get, true);
 }
 
 
-static inline gallus_result_t
-s_bbq2_peek(gallus_bbq2_t *qptr,
-            void **valptr,
-            size_t valsz,
-            gallus_chrono_t nsec) {
+gallus_result_t
+gallus_bbq2_peek(gallus_bbq2_t *qptr,
+                 void **valptr,
+                 size_t valsz,
+                 gallus_chrono_t nsec) {
   gallus_result_t n = s_get_n(qptr, (void *)valptr, 1LL, 1LL,
                               valsz, nsec, NULL, false);
   return (n == 1LL) ? GALLUS_RESULT_OK : n;
 }
 
 
-static inline gallus_result_t
+gallus_result_t
 gallus_bbq2_peek_n(gallus_bbq2_t *qptr,
                    void **valptr,
                    size_t n_vals_max,
@@ -1377,8 +1367,8 @@ gallus_bbq2_peek_n(gallus_bbq2_t *qptr,
 
 
 
-static inline gallus_result_t
-s_bbq2_size(gallus_bbq2_t *qptr) {
+gallus_result_t
+gallus_bbq2_size(gallus_bbq2_t *qptr) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (likely(qptr != NULL &&
@@ -1396,8 +1386,8 @@ s_bbq2_size(gallus_bbq2_t *qptr) {
 }
 
 
-static inline gallus_result_t
-s_bbq2_remaining_capacity(gallus_bbq2_t *qptr) {
+gallus_result_t
+gallus_bbq2_remaining_capacity(gallus_bbq2_t *qptr) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (likely(qptr != NULL &&
@@ -1416,8 +1406,8 @@ s_bbq2_remaining_capacity(gallus_bbq2_t *qptr) {
 }
 
 
-static inline gallus_result_t
-s_bbq2_max_capacity(gallus_bbq2_t *qptr) {
+gallus_result_t
+gallus_bbq2_max_capacity(gallus_bbq2_t *qptr) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (likely(qptr != NULL &&
@@ -1435,8 +1425,8 @@ s_bbq2_max_capacity(gallus_bbq2_t *qptr) {
 }
 
 
-static inline gallus_result_t
-s_bbq2_is_full(gallus_bbq2_t *qptr, bool *retptr) {
+gallus_result_t
+gallus_bbq2_is_full(gallus_bbq2_t *qptr, bool *retptr) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (likely(qptr != NULL &&
@@ -1458,8 +1448,8 @@ s_bbq2_is_full(gallus_bbq2_t *qptr, bool *retptr) {
 }
 
 
-static inline gallus_result_t
-s_bbq2_is_empty(gallus_bbq2_t *qptr, bool *retptr) {
+gallus_result_t
+gallus_bbq2_is_empty(gallus_bbq2_t *qptr, bool *retptr) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (likely(qptr != NULL &&
@@ -1480,8 +1470,8 @@ s_bbq2_is_empty(gallus_bbq2_t *qptr, bool *retptr) {
 }
 
 
-static inline gallus_result_t
-s_bbq2_is_operational(gallus_bbq2_t *qptr, bool *retptr) {
+gallus_result_t
+gallus_bbq2_is_operational(gallus_bbq2_t *qptr, bool *retptr) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (likely(qptr != NULL &&
@@ -1497,8 +1487,8 @@ s_bbq2_is_operational(gallus_bbq2_t *qptr, bool *retptr) {
 }
 
 
-static inline void
-s_bbq2_cancel_janitor(gallus_bbq2_t *qptr) {
+void
+gallus_bbq2_cancel_janitor(gallus_bbq2_t *qptr) {
   if (likely(qptr != NULL &&
              *qptr != NULL)) {
     s_spinunlock(*qptr);
