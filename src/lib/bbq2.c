@@ -1134,6 +1134,8 @@ s_bbq2_destroy(gallus_bbq2_t *qptr,
     s_spinlock(*qptr);
     {
       s_shutdown(*qptr, free_values);
+      gallus_free_on_numanode((*qptr)->m_put_results);
+      gallus_free_on_numanode((*qptr)->m_get_results);
       gallus_cond_destroy(&((*qptr)->m_put_cond));
       gallus_cond_destroy(&((*qptr)->m_get_cond));
       gallus_cond_destroy(&((*qptr)->m_awaken_cond));
