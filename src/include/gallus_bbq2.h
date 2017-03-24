@@ -91,7 +91,7 @@ gallus_bbq2_destroy(gallus_bbq2_t *qptr, bool free_values);
  *     @param[in]  qptr        A pointer to a bbq.
  *     @param[in]  free_values  If \b true, all the values
  *     remaining in the bbq are freed if the value free up
- *     function given by the calling of the gallus_cbuffer_create()
+ *     function given by the calling of the gallus_bbq2_create()
  *     is not \b NULL.
  *
  *     @retval GALLUS_RESULT_OK                Succeeded.
@@ -452,7 +452,7 @@ gallus_bbq2_is_full(gallus_bbq2_t *qptr, bool *retptr);
 /**
  * Returns \b true if the bbq is empty.
  *
- *    @param[in]   cbptr    A pointer to a bbq.
+ *    @param[in]   qptr     A pointer to a bbq.
  *    @param[out]  retptr   A pointer to a result.
  *
  *	@retval	GALLUS_RESULT_OK		Succeeded.
@@ -484,7 +484,7 @@ gallus_bbq2_is_operational(gallus_bbq2_t *qptr, bool *retptr);
  *	@param[in]	qptr	A pointer to a bbq.
  */
 void
-gallus_bbq2_cancel_janitor(gallus_bbq2_t *cbptr);
+gallus_bbq2_cancel_janitor(gallus_bbq2_t *qptr);
 
 
 
