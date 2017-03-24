@@ -48,7 +48,6 @@ typedef struct gallus_bbq2_record {
   volatile uint64_t m_cur_get_seq;
   volatile uint64_t m_done_get_seq;
 
-  size_t m_n_max_threads;
   memcpy_result_t *m_put_results;
   memcpy_result_t *m_get_results;
   
@@ -163,9 +162,9 @@ s_clean(gallus_bbq2_t q, bool free_values, bool do_wake) {
     (void)memset((void *)(q->m_data), 0,
                  q->m_element_size * q->m_n_max_elements);
     (void)memset((void *)(q->m_put_results), 0,
-                 sizeof(memcpy_result_t) * q->m_n_max_threads);
+                 sizeof(memcpy_result_t) * q->m_n_max_elements);
     (void)memset((void *)(q->m_get_results), 0,
-                 sizeof(memcpy_result_t) * q->m_n_max_threads);
+                 sizeof(memcpy_result_t) * q->m_n_max_elements);
     q->m_n_elements = 0;
     q->m_n_elements_temp = 0;
     q->m_cur_put_seq = 0;
@@ -260,7 +259,7 @@ s_do_copyin(gallus_bbq2_t q, uint64_t my_w_idx, void *buf, size_t max_n,
    * Acquire a "slot" to store following memcpy()s' result/side effect
    * and store them into the slot.
    */
-  uint64_t seq_idx = my_put_seq % q->m_n_max_threads;
+  uint64_t seq_idx = my_put_seq % q->m_n_max_elements;
 
   q->m_put_results[seq_idx].m_done = false;
   q->m_put_results[seq_idx].m_seq = my_put_seq;
@@ -297,7 +296,7 @@ s_acquire_put_remains(gallus_bbq2_t q, uint64_t my_put_seq) {
 
 static inline uint64_t
 s_acquire_put_index(gallus_bbq2_t q, uint64_t my_seq_idx, uint64_t relidx) {
-  return (my_seq_idx + q->m_n_max_threads - relidx) % q->m_n_max_threads;
+  return (my_seq_idx + q->m_n_max_elements - relidx) % q->m_n_max_elements;
 }
 
 
@@ -461,7 +460,7 @@ s_do_copyout(gallus_bbq2_t q, uint64_t my_r_idx, void *buf, size_t max_n,
    * Acquire a "slot" to store following memcpy()s' result/side effect
    * and store them into the slot.
    */
-  uint64_t seq_idx = my_get_seq % q->m_n_max_threads;
+  uint64_t seq_idx = my_get_seq % q->m_n_max_elements;
   q->m_get_results[seq_idx].m_done = false;
   q->m_get_results[seq_idx].m_seq = my_get_seq;
   q->m_get_results[seq_idx].m_n_amount = max_n;
@@ -485,7 +484,7 @@ s_acquire_get_remains(gallus_bbq2_t q, uint64_t my_get_seq) {
 
 static inline uint64_t
 s_acquire_get_index(gallus_bbq2_t q, uint64_t my_seq_idx, uint64_t relidx) {
-  return (my_seq_idx + q->m_n_max_threads - relidx) % q->m_n_max_threads;
+  return (my_seq_idx + q->m_n_max_elements - relidx) % q->m_n_max_elements;
 }
 
 
@@ -1042,7 +1041,6 @@ s_bbq2_create(gallus_bbq2_t *qptr,
               unsigned int numa_node,
               size_t elemsize,
               size_t maxelems,
-              size_t maxthd,
               gallus_bbq2_value_freeup_proc_t proc) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
@@ -1055,11 +1053,11 @@ s_bbq2_create(gallus_bbq2_t *qptr,
             numa_node);
     memcpy_result_t *put_res =
         (memcpy_result_t *)gallus_malloc_on_numanode(
-            sizeof(memcpy_result_t) * maxthd,
+            sizeof(memcpy_result_t) * maxelems,
             numa_node);
     memcpy_result_t *get_res =
         (memcpy_result_t *)gallus_malloc_on_numanode(
-            sizeof(memcpy_result_t) * maxthd,
+            sizeof(memcpy_result_t) * maxelems,
             numa_node);
 
     *qptr = NULL;
@@ -1084,7 +1082,6 @@ s_bbq2_create(gallus_bbq2_t *qptr,
         q->m_numa_node = numa_node;
         q->m_n_max_elements = maxelems;
         q->m_element_size = elemsize;
-        q->m_n_max_threads = maxthd;
         q->m_del_proc = proc;
         q->m_put_results = put_res;
         q->m_get_results = get_res;
