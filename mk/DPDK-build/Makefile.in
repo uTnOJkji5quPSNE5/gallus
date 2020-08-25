@@ -1,0 +1,19 @@
+TOPDIR          = @TOPDIR@
+MKRULESDIR      = @MKRULESDIR@
+
+include $(MKRULESDIR)/vars.mk
+
+ifneq ($(DPDK_DIR),)
+all::	$(MKRULESDIR)/dpdk.mk
+$(MKRULESDIR)/dpdk.mk:	./Makefile.dpdk ./mkdpdkflags.sh
+	rm -f $@
+	$(SHELL) ./mkdpdkflags.sh > $@
+else
+all::
+	@true
+endif
+
+distclean::
+	rm -rf Makefile Makefile.dpdk $(MKRULESDIR)/dpdk.mk
+
+include $(MKRULESDIR)/rules.mk

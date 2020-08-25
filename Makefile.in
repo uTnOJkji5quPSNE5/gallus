@@ -3,7 +3,8 @@ MKRULESDIR	= @MKRULESDIR@
 
 include $(MKRULESDIR)/vars.mk
 
-DIRS	=	tools \
+DIRS	=	mk/DPDK-build \
+		tools \
 		src/lib \
 		src/include
 
@@ -23,7 +24,8 @@ distclean::	clean
 	$(RM) config.* mk/vars.mk mk/doxygen.conf ./libtool \
 		mk/changeincludes mk/changename mk/initdepend \
 		src/include/gallus_ecode.h \
-		src/lib/ecode.c
+		src/lib/ecode.c \
+		mk/dpdk.mk mk/DPDK-build/Makefile
 	find . -type f \( \
 		-name '.depend' \
 	\) | xargs $(RM)

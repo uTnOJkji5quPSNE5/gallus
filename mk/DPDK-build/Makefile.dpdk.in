@@ -1,0 +1,27 @@
+TOPDIR          = @TOPDIR@
+MKRULESDIR      = @MKRULESDIR@
+
+include $(MKRULESDIR)/vars.mk
+CFLAGS	=
+LDFLAGS	=
+
+NOT_FIRST_CALL=y
+RTE_EXEC_ENV=linuxapp
+RTE_SDK_BIN=$(DPDK_DIR)
+
+include $(RTE_SDK)/mk/rte.vars.mk
+include $(RTE_SDK)/$(RTE_TARGET)/.config
+include $(RTE_SDK)/mk/rte.extapp.mk
+
+
+dpdk_libs:
+	@echo $(_LDLIBS-y)
+
+dpdk_ldflags:
+	@echo $(LDFLAGS)
+
+dpdk_cflags:
+	@echo $(CFLAGS)
+
+distclean::
+	rm -rf Makefile

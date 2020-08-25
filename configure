@@ -635,6 +635,9 @@ HAVE_UNITY
 NUMA_LIBS
 GMP_LIBS
 SSL_LIBS
+HAVE_PROTOC
+SPDK_DIR
+DPDK_DIR
 PCAP_LIBS
 HAVE_GCOVR
 HAVE_JQ
@@ -650,6 +653,7 @@ OS_LDFLAGS
 OS_CFLAGS
 OS_CPPFLAGS
 MAKE
+TOOLCHAIN_TARGET
 BASENAME
 READLINK
 MKDIR
@@ -764,6 +768,8 @@ with_gnu_ld
 with_sysroot
 enable_libtool_lock
 enable_developer
+with_dpdk
+enable_spdk
 enable_numa
 '
       ac_precious_vars='build_alias
@@ -1413,6 +1419,10 @@ Optional Features:
   --enable-developer      enable build for developers, like unit tests
                           [default is no]
 
+  --with-spdk=/path/to/spdk
+                          specify SPDK installation directory (implies
+                          --with-dpdk.)
+
   --enable-numa           Support NUMA (if supported).
 
 Optional Packages:
@@ -1426,6 +1436,8 @@ Optional Packages:
   --with-gnu-ld           assume the C compiler uses GNU ld [default=no]
   --with-sysroot[=DIR]    Search for dependent libraries within DIR (or the
                           compiler's sysroot if not specified).
+  --enable-dpdk           enable DPDK. [default: no]
+
 
 Some influential environment variables:
   CC          C compiler command
@@ -2567,7 +2579,7 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 
 # libtool.m4 - Configure libtool for the host system. -*-Autoconf-*-
 #
-#   Copyright (C) 1996-2001, 2003-2016 Free Software Foundation, Inc.
+#   Copyright (C) 1996-2001, 2003-2015 Free Software Foundation, Inc.
 #   Written by Gordon Matzigkeit, 1996
 #
 # This file is free software; the Free Software Foundation gives
@@ -3651,7 +3663,7 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 
 # Helper functions for option handling.                    -*- Autoconf -*-
 #
-#   Copyright (C) 2004-2005, 2007-2009, 2011-2016 Free Software
+#   Copyright (C) 2004-2005, 2007-2009, 2011-2015 Free Software
 #   Foundation, Inc.
 #   Written by Gary V. Vaughan, 2004
 #
@@ -3993,7 +4005,7 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 
 # ltsugar.m4 -- libtool m4 base layer.                         -*-Autoconf-*-
 #
-# Copyright (C) 2004-2005, 2007-2008, 2011-2016 Free Software
+# Copyright (C) 2004-2005, 2007-2008, 2011-2015 Free Software
 # Foundation, Inc.
 # Written by Gary V. Vaughan, 2004
 #
@@ -4084,7 +4096,7 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 
 # ltversion.m4 -- version numbers			-*- Autoconf -*-
 #
-#   Copyright (C) 2004, 2011-2016 Free Software Foundation, Inc.
+#   Copyright (C) 2004, 2011-2015 Free Software Foundation, Inc.
 #   Written by Scott James Remnant, 2004
 #
 # This file is free software; the Free Software Foundation gives
@@ -4093,7 +4105,7 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 
 # @configure_input@
 
-# serial 4213 ltversion.m4
+# serial 4179 ltversion.m4
 # This file is part of GNU Libtool
 
 
@@ -4103,7 +4115,7 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 
 # lt~obsolete.m4 -- aclocal satisfying obsolete definitions.    -*-Autoconf-*-
 #
-#   Copyright (C) 2004-2005, 2007, 2009, 2011-2016 Free Software
+#   Copyright (C) 2004-2005, 2007, 2009, 2011-2015 Free Software
 #   Foundation, Inc.
 #   Written by Scott James Remnant, 2004.
 #
@@ -4240,8 +4252,8 @@ esac
 
 
 
-macro_version='2.4.6.34-08c5'
-macro_revision='2.4.6.34'
+macro_version='2.4.6'
+macro_revision='2.4.6'
 
 
 
@@ -6330,7 +6342,7 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | gnu*)
   lt_cv_deplibs_check_method=pass_all
   ;;
 
-netbsd*)
+netbsd* | netbsdelf*-gnu)
   if echo __ELF__ | $CC -E - | $GREP __ELF__ > /dev/null; then
     lt_cv_deplibs_check_method='match_pattern /lib[^/]+(\.so\.[0-9]+\.[0-9]+|_pic\.a)$'
   else
@@ -6693,28 +6705,12 @@ esac
 fi
 
 : ${AR=ar}
+: ${AR_FLAGS=cr}
 
 
 
 
 
-
-# Use ARFLAGS variable as AR's operation code to sync the variable naming with
-# Automake.  If both AR_FLAGS and ARFLAGS are specified, AR_FLAGS should have
-# higher priority because thats what people were doing historically (setting
-# ARFLAGS for automake and AR_FLAGS for libtool).  FIXME: Make the AR_FLAGS
-# variable obsoleted/removed.
-
-test ${AR_FLAGS+y} || AR_FLAGS=${ARFLAGS-cr}
-lt_ar_flags=$AR_FLAGS
-
-
-
-
-
-
-# Make AR_FLAGS overridable by 'make ARFLAGS='.  Don't try to run-time override
-# by AR_FLAGS because that was never working and AR_FLAGS is about to die.
 
 
 
@@ -7252,11 +7248,8 @@ _LT_EOF
   test $ac_status = 0; }; then
     # Now try to grab the symbols.
     nlist=conftest.nm
-    if { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$NM conftest.$ac_objext \| "$lt_cv_sys_global_symbol_pipe" \> $nlist\""; } >&5
-  (eval $NM conftest.$ac_objext \| "$lt_cv_sys_global_symbol_pipe" \> $nlist) 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; } && test -s "$nlist"; then
+    $ECHO "$as_me:$LINENO: $NM conftest.$ac_objext | $lt_cv_sys_global_symbol_pipe > $nlist" >&5
+    if eval "$NM" conftest.$ac_objext \| "$lt_cv_sys_global_symbol_pipe" \> $nlist 2>&5 && test -s "$nlist"; then
       # Try sorting and uniquifying the output.
       if sort "$nlist" | uniq > "$nlist"T; then
 	mv -f "$nlist"T "$nlist"
@@ -8475,8 +8468,8 @@ int forced_loaded() { return 2;}
 _LT_EOF
       echo "$LTCC $LTCFLAGS -c -o conftest.o conftest.c" >&5
       $LTCC $LTCFLAGS -c -o conftest.o conftest.c 2>&5
-      echo "$AR $AR_FLAGS libconftest.a conftest.o" >&5
-      $AR $AR_FLAGS libconftest.a conftest.o 2>&5
+      echo "$AR cr libconftest.a conftest.o" >&5
+      $AR cr libconftest.a conftest.o 2>&5
       echo "$RANLIB libconftest.a" >&5
       $RANLIB libconftest.a 2>&5
       cat > conftest.c << _LT_EOF
@@ -9605,6 +9598,12 @@ lt_prog_compiler_static=
 	lt_prog_compiler_pic='-KPIC'
 	lt_prog_compiler_static='-static'
         ;;
+      # flang / f18. f95 an alias for gfortran or flang on Debian
+      flang* | f18* | f95*)
+	lt_prog_compiler_wl='-Wl,'
+	lt_prog_compiler_pic='-fPIC'
+	lt_prog_compiler_static='-static'
+        ;;
       # icc used to be incompatible with GCC.
       # ICC 10 doesn't accept -KPIC any more.
       icc* | ifort*)
@@ -10081,6 +10080,9 @@ $as_echo_n "checking whether the $compiler linker ($LD) supports shared librarie
   openbsd* | bitrig*)
     with_gnu_ld=no
     ;;
+  linux* | k*bsd*-gnu | gnu*)
+    link_all_deplibs=no
+    ;;
   esac
 
   ld_shlibs=yes
@@ -10239,7 +10241,6 @@ _LT_EOF
 	emximp -o $lib $output_objdir/$libname.def'
       old_archive_From_new_cmds='emximp -o $output_objdir/${libname}_dll.a $output_objdir/$libname.def'
       enable_shared_with_static_runtimes=yes
-      file_list_spec='@'
       ;;
 
     interix[3-9]*)
@@ -10336,7 +10337,7 @@ _LT_EOF
       fi
       ;;
 
-    netbsd*)
+    netbsd* | netbsdelf*-gnu)
       if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then
 	archive_cmds='$LD -Bshareable $libobjs $deplibs $linker_flags -o $lib'
 	wlarc=
@@ -10457,7 +10458,7 @@ _LT_EOF
 	if $NM -V 2>&1 | $GREP 'GNU' > /dev/null; then
 	  export_symbols_cmds='$NM -Bpg $libobjs $convenience | awk '\''{ if (((\$ 2 == "T") || (\$ 2 == "D") || (\$ 2 == "B") || (\$ 2 == "W")) && (substr(\$ 3,1,1) != ".")) { if (\$ 2 == "W") { print \$ 3 " weak" } else { print \$ 3 } } }'\'' | sort -u > $export_symbols'
 	else
-	  export_symbols_cmds='`func_echo_all $NM | $SED -e '\''s/B\([^B]*\)$/P\1/'\''` -PCpgl $libobjs $convenience | awk '\''{ if (((\$ 2 == "T") || (\$ 2 == "D") || (\$ 2 == "B") || (\$ 2 == "L") || (\$ 2 == "W") || (\$ 2 == "V") || (\$ 2 == "Z")) && (substr(\$ 1,1,1) != ".")) { if ((\$ 2 == "W") || (\$ 2 == "V") || (\$ 2 == "Z")) { print \$ 1 " weak" } else { print \$ 1 } } }'\'' | sort -u > $export_symbols'
+	  export_symbols_cmds='`func_echo_all $NM | $SED -e '\''s/B\([^B]*\)$/P\1/'\''` -PCpgl $libobjs $convenience | awk '\''{ if (((\$ 2 == "T") || (\$ 2 == "D") || (\$ 2 == "B") || (\$ 2 == "W") || (\$ 2 == "V") || (\$ 2 == "Z")) && (substr(\$ 1,1,1) != ".")) { if ((\$ 2 == "W") || (\$ 2 == "V") || (\$ 2 == "Z")) { print \$ 1 " weak" } else { print \$ 1 } } }'\'' | sort -u > $export_symbols'
 	fi
 	aix_use_runtimelinking=no
 
@@ -11006,6 +11007,7 @@ $as_echo "$lt_cv_irix_exported_symbol" >&6; }
 	if test yes = "$lt_cv_irix_exported_symbol"; then
           archive_expsym_cmds='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname `test -n "$verstring" && func_echo_all "$wl-set_version $wl$verstring"` $wl-update_registry $wl$output_objdir/so_locations $wl-exports_file $wl$export_symbols -o $lib'
 	fi
+	link_all_deplibs=no
       else
 	archive_cmds='$CC -shared $libobjs $deplibs $compiler_flags -soname $soname `test -n "$verstring" && func_echo_all "-set_version $verstring"` -update_registry $output_objdir/so_locations -o $lib'
 	archive_expsym_cmds='$CC -shared $libobjs $deplibs $compiler_flags -soname $soname `test -n "$verstring" && func_echo_all "-set_version $verstring"` -update_registry $output_objdir/so_locations -exports_file $export_symbols -o $lib'
@@ -11027,7 +11029,7 @@ $as_echo "$lt_cv_irix_exported_symbol" >&6; }
       esac
       ;;
 
-    netbsd*)
+    netbsd* | netbsdelf*-gnu)
       if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then
 	archive_cmds='$LD -Bshareable -o $lib $libobjs $deplibs $linker_flags'  # a.out
       else
@@ -11094,7 +11096,6 @@ $as_echo "$lt_cv_irix_exported_symbol" >&6; }
 	emximp -o $lib $output_objdir/$libname.def'
       old_archive_From_new_cmds='emximp -o $output_objdir/${libname}_dll.a $output_objdir/$libname.def'
       enable_shared_with_static_runtimes=yes
-      file_list_spec='@'
       ;;
 
     osf3*)
@@ -12143,6 +12144,18 @@ fi
   dynamic_linker='GNU/Linux ld.so'
   ;;
 
+netbsdelf*-gnu)
+  version_type=linux
+  need_lib_prefix=no
+  need_version=no
+  library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext}$major ${libname}${shared_ext}'
+  soname_spec='${libname}${release}${shared_ext}$major'
+  shlibpath_var=LD_LIBRARY_PATH
+  shlibpath_overrides_runpath=no
+  hardcode_into_libs=yes
+  dynamic_linker='NetBSD ld.elf_so'
+  ;;
+
 netbsd*)
   version_type=sunos
   need_lib_prefix=no
@@ -13038,41 +13051,30 @@ striplib=
 old_striplib=
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether stripping libraries is possible" >&5
 $as_echo_n "checking whether stripping libraries is possible... " >&6; }
-if test -z "$STRIP"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-else
-  if $STRIP -V 2>&1 | $GREP "GNU strip" >/dev/null; then
-    old_striplib="$STRIP --strip-debug"
-    striplib="$STRIP --strip-unneeded"
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+if test -n "$STRIP" && $STRIP -V 2>&1 | $GREP "GNU strip" >/dev/null; then
+  test -z "$old_striplib" && old_striplib="$STRIP --strip-debug"
+  test -z "$striplib" && striplib="$STRIP --strip-unneeded"
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
-  else
-    case $host_os in
-    darwin*)
-      # FIXME - insert some real tests, host_os isn't really good enough
+else
+# FIXME - insert some real tests, host_os isn't really good enough
+  case $host_os in
+  darwin*)
+    if test -n "$STRIP"; then
       striplib="$STRIP -x"
       old_striplib="$STRIP -S"
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
-      ;;
-    freebsd*)
-      if $STRIP -V 2>&1 | $GREP "elftoolchain" >/dev/null; then
-        old_striplib="$STRIP --strip-debug"
-        striplib="$STRIP --strip-unneeded"
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-      else
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-      fi
-      ;;
-    *)
+    else
       { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-      ;;
-    esac
-  fi
+    fi
+    ;;
+  *)
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+    ;;
+  esac
 fi
 
 
@@ -14509,7 +14511,7 @@ with_gnu_ld=$lt_cv_prog_gnu_ld
       # Commands to make compiler produce verbose output that lists
       # what "hidden" libraries, object files and flags are used when
       # linking a shared library.
-      output_verbose_link_cmd='$CC -shared $CFLAGS -v conftest.$objext 2>&1 | $GREP -v "^Configured with:" | $GREP "\-L"'
+      output_verbose_link_cmd='$CC -shared $CFLAGS -v conftest.$objext 2>&1 | $GREP -v "^Configured with:" | $GREP " \-L"'
 
     else
       GXX=no
@@ -14936,7 +14938,6 @@ fi
 	  emximp -o $lib $output_objdir/$libname.def'
 	old_archive_From_new_cmds_CXX='emximp -o $output_objdir/${libname}_dll.a $output_objdir/$libname.def'
 	enable_shared_with_static_runtimes_CXX=yes
-	file_list_spec_CXX='@'
 	;;
 
       dgux*)
@@ -15002,7 +15003,7 @@ fi
             # explicitly linking system object files so we need to strip them
             # from the output so that they don't get included in the library
             # dependencies.
-            output_verbose_link_cmd='templist=`($CC -b $CFLAGS -v conftest.$objext 2>&1) | $EGREP "\-L"`; list= ; for z in $templist; do case $z in conftest.$objext) list="$list $z";; *.$objext);; *) list="$list $z";;esac; done; func_echo_all "$list"'
+            output_verbose_link_cmd='templist=`($CC -b $CFLAGS -v conftest.$objext 2>&1) | $EGREP " \-L"`; list= ; for z in $templist; do case $z in conftest.$objext) list="$list $z";; *.$objext);; *) list="$list $z";;esac; done; func_echo_all "$list"'
             ;;
           *)
             if test yes = "$GXX"; then
@@ -15067,7 +15068,7 @@ fi
 	    # explicitly linking system object files so we need to strip them
 	    # from the output so that they don't get included in the library
 	    # dependencies.
-	    output_verbose_link_cmd='templist=`($CC -b $CFLAGS -v conftest.$objext 2>&1) | $GREP "\-L"`; list= ; for z in $templist; do case $z in conftest.$objext) list="$list $z";; *.$objext);; *) list="$list $z";;esac; done; func_echo_all "$list"'
+	    output_verbose_link_cmd='templist=`($CC -b $CFLAGS -v conftest.$objext 2>&1) | $GREP " \-L"`; list= ; for z in $templist; do case $z in conftest.$objext) list="$list $z";; *.$objext);; *) list="$list $z";;esac; done; func_echo_all "$list"'
 	    ;;
           *)
 	    if test yes = "$GXX"; then
@@ -15406,7 +15407,7 @@ fi
 	      # Commands to make compiler produce verbose output that lists
 	      # what "hidden" libraries, object files and flags are used when
 	      # linking a shared library.
-	      output_verbose_link_cmd='$CC -shared $CFLAGS -v conftest.$objext 2>&1 | $GREP -v "^Configured with:" | $GREP "\-L"'
+	      output_verbose_link_cmd='$CC -shared $CFLAGS -v conftest.$objext 2>&1 | $GREP -v "^Configured with:" | $GREP " \-L"'
 
 	    else
 	      # FIXME: insert proper C++ library support
@@ -15490,7 +15491,7 @@ fi
 	        # Commands to make compiler produce verbose output that lists
 	        # what "hidden" libraries, object files and flags are used when
 	        # linking a shared library.
-	        output_verbose_link_cmd='$CC -shared $CFLAGS -v conftest.$objext 2>&1 | $GREP -v "^Configured with:" | $GREP "\-L"'
+	        output_verbose_link_cmd='$CC -shared $CFLAGS -v conftest.$objext 2>&1 | $GREP -v "^Configured with:" | $GREP " \-L"'
 	      else
 	        # g++ 2.7 appears to require '-G' NOT '-shared' on this
 	        # platform.
@@ -15501,7 +15502,7 @@ fi
 	        # Commands to make compiler produce verbose output that lists
 	        # what "hidden" libraries, object files and flags are used when
 	        # linking a shared library.
-	        output_verbose_link_cmd='$CC -G $CFLAGS -v conftest.$objext 2>&1 | $GREP -v "^Configured with:" | $GREP "\-L"'
+	        output_verbose_link_cmd='$CC -G $CFLAGS -v conftest.$objext 2>&1 | $GREP -v "^Configured with:" | $GREP " \-L"'
 	      fi
 
 	      hardcode_libdir_flag_spec_CXX='$wl-R $wl$libdir'
@@ -16014,7 +16015,7 @@ lt_prog_compiler_static_CXX=
 	    ;;
 	esac
 	;;
-      netbsd*)
+      netbsd* | netbsdelf*-gnu)
 	;;
       *qnx* | *nto*)
         # QNX uses GNU C++, but need to define -shared option too, otherwise
@@ -16372,7 +16373,7 @@ $as_echo_n "checking whether the $compiler linker ($LD) supports shared librarie
     if $NM -V 2>&1 | $GREP 'GNU' > /dev/null; then
       export_symbols_cmds_CXX='$NM -Bpg $libobjs $convenience | awk '\''{ if (((\$ 2 == "T") || (\$ 2 == "D") || (\$ 2 == "B") || (\$ 2 == "W")) && (substr(\$ 3,1,1) != ".")) { if (\$ 2 == "W") { print \$ 3 " weak" } else { print \$ 3 } } }'\'' | sort -u > $export_symbols'
     else
-      export_symbols_cmds_CXX='`func_echo_all $NM | $SED -e '\''s/B\([^B]*\)$/P\1/'\''` -PCpgl $libobjs $convenience | awk '\''{ if (((\$ 2 == "T") || (\$ 2 == "D") || (\$ 2 == "B") || (\$ 2 == "L") || (\$ 2 == "W") || (\$ 2 == "V") || (\$ 2 == "Z")) && (substr(\$ 1,1,1) != ".")) { if ((\$ 2 == "W") || (\$ 2 == "V") || (\$ 2 == "Z")) { print \$ 1 " weak" } else { print \$ 1 } } }'\'' | sort -u > $export_symbols'
+      export_symbols_cmds_CXX='`func_echo_all $NM | $SED -e '\''s/B\([^B]*\)$/P\1/'\''` -PCpgl $libobjs $convenience | awk '\''{ if (((\$ 2 == "T") || (\$ 2 == "D") || (\$ 2 == "B") || (\$ 2 == "W") || (\$ 2 == "V") || (\$ 2 == "Z")) && (substr(\$ 1,1,1) != ".")) { if ((\$ 2 == "W") || (\$ 2 == "V") || (\$ 2 == "Z")) { print \$ 1 " weak" } else { print \$ 1 } } }'\'' | sort -u > $export_symbols'
     fi
     ;;
   pw32*)
@@ -16388,6 +16389,9 @@ $as_echo_n "checking whether the $compiler linker ($LD) supports shared librarie
       exclude_expsyms_CXX='[_]+GLOBAL_OFFSET_TABLE_|[_]+GLOBAL__[FID]_.*|[_]+head_[A-Za-z0-9_]+_dll|[A-Za-z0-9_]+_dll_iname'
       ;;
     esac
+    ;;
+  linux* | k*bsd*-gnu | gnu*)
+    link_all_deplibs_CXX=no
     ;;
   *)
     export_symbols_cmds_CXX='$NM $libobjs $convenience | $global_symbol_pipe | $SED '\''s/.* //'\'' | sort | uniq > $export_symbols'
@@ -17080,6 +17084,18 @@ fi
   # people can always --disable-shared, the test was removed, and we
   # assume the GNU/Linux dynamic linker is in use.
   dynamic_linker='GNU/Linux ld.so'
+  ;;
+
+netbsdelf*-gnu)
+  version_type=linux
+  need_lib_prefix=no
+  need_version=no
+  library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext}$major ${libname}${shared_ext}'
+  soname_spec='${libname}${release}${shared_ext}$major'
+  shlibpath_var=LD_LIBRARY_PATH
+  shlibpath_overrides_runpath=no
+  hardcode_into_libs=yes
+  dynamic_linker='NetBSD ld.elf_so'
   ;;
 
 netbsd*)
@@ -18029,6 +18045,29 @@ case $OS in
 	OS=darwin;;
 esac
 
+# checking CC
+TOOLCHAIN_TARGET=''
+if test -z "${CC}"; then
+    CC=gcc
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking toolchain target arch" >&5
+$as_echo_n "checking toolchain target arch... " >&6; }
+_v=`${CC} -v 2>&1 | egrep '^Target:' | awk '{ print $NF }'`
+if test $? -eq 0 -a ! -z "${_v}"; then
+    case ${CC} in
+    	*gcc)
+	    TOOLCHAIN_TARGET=${_v};;
+    esac
+    if test -z "${TOOLCHAIN_TARGET}"; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: unknown, yet." >&5
+$as_echo "unknown, yet." >&6; }
+    else
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: ${TOOLCHAIN_TARGET}" >&5
+$as_echo "${TOOLCHAIN_TARGET}" >&6; }
+    fi
+fi
+
+
 
 
 
@@ -18054,9 +18093,10 @@ RUBY=ruby
 NKF=nkf
 UNITY_SRC_DIR=
 
+developer=no
 # Check whether --enable-developer was given.
 if test "${enable_developer+set}" = set; then :
-  enableval=$enable_developer; developer="$withval"
+  enableval=$enable_developer; developer="$enableval"
 else
   developer=no
 fi
@@ -18943,6 +18983,87 @@ fi
 
 
 
+# use DPDK or not
+use_dpdk=no
+
+# Check whether --with-dpdk was given.
+if test "${with_dpdk+set}" = set; then :
+  withval=$with_dpdk; use_dpdk="$withval"
+else
+  use_dpdk=no
+fi
+
+
+spdk_dir=''
+# Check whether --enable-spdk was given.
+if test "${enable_spdk+set}" = set; then :
+  enableval=$enable_spdk; spdk_dir="$enableval"
+else
+  spdk_dir=''
+fi
+
+if test "x${enable_spdk}" = "xyes" -o "x${enable_spdk}" = "xno"; then
+    spdk_dir=''
+fi
+if test ! -z "${spdk_dir}"; then
+    use_dpdk=yes
+fi
+
+# checking for DPDK
+DPDK_DIR=''
+if test "x${use_dpdk}" = "xyes"; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking DPDK and the environmental variable" >&5
+$as_echo_n "checking DPDK and the environmental variable... " >&6; }
+    if test ! -z "${RTE_SDK}" -a ! -z "${RTE_TARGET}"; then
+        if test -d "${RTE_SDK}" -a -d "${RTE_SDK}/${RTE_TARGET}"; then
+            DPDK_DIR="${RTE_SDK}/${RTE_TARGET}"
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: result: available." >&5
+$as_echo "available." >&6; }
+        else
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: result: not available." >&5
+$as_echo "not available." >&6; }
+	    as_fn_error $? "RTE_SDK and/or RTE_TARGET not properly set." "$LINENO" 5
+        fi
+    else
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: not available." >&5
+$as_echo "not available." >&6; }
+	as_fn_error $? "RTE_SDK and/or RTE_TARGET not set." "$LINENO" 5
+    fi
+fi
+
+
+# checking for SPDK
+SPDK_DIR=''
+if test ! -z "${spdk_dir}"; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking SPDK" >&5
+$as_echo_n "checking SPDK... " >&6; }
+    if test -d "${spdk_dir}" -a -r "${spdk_dir}/include/spdk/config.h"; then
+        SPDK_DIR="${spdk_dir}"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: available." >&5
+$as_echo "available." >&6; }
+    else
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: not available." >&5
+$as_echo "not available." >&6; }
+	as_fn_error $? "SPDK directory is not properly specified or not exists." "$LINENO" 5
+    fi
+fi
+
+
+# checking for protoc
+HAVE_PROTOC=''
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking protoc" >&5
+$as_echo_n "checking protoc... " >&6; }
+_v=`protoc --version 2>&1 | awk '{ print $1 }'`
+if test "x${_v}" = "xlibprotoc"; then
+    HAVE_PROTOC=yes
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: available." >&5
+$as_echo "available." >&6; }
+else
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: not available." >&5
+$as_echo "not available." >&6; }
+fi
+
+
 # check ssl library
 ac_fn_c_check_header_mongrel "$LINENO" "openssl/ssl.h" "ac_cv_header_openssl_ssl_h" "$ac_includes_default"
 if test "x$ac_cv_header_openssl_ssl_h" = xyes; then :
@@ -19331,7 +19452,7 @@ fi
 
 
 # emit.
-ac_config_files="$ac_config_files mk/vars.mk mk/doxygen.conf Makefile src/include/Makefile src/include/gallus_platform.h src/lib/Makefile src/lib/test/Makefile src/lib/check/Makefile tools/Makefile"
+ac_config_files="$ac_config_files mk/vars.mk mk/DPDK-build/Makefile.dpdk mk/DPDK-build/Makefile mk/doxygen.conf Makefile src/include/Makefile src/include/gallus_platform.h src/lib/Makefile src/lib/test/Makefile src/lib/check/Makefile tools/Makefile"
 
 
 # emit and set executable attribute.
@@ -20118,7 +20239,6 @@ want_nocaseglob='`$ECHO "$want_nocaseglob" | $SED "$delay_single_quote_subst"`'
 DLLTOOL='`$ECHO "$DLLTOOL" | $SED "$delay_single_quote_subst"`'
 sharedlib_from_linklib_cmd='`$ECHO "$sharedlib_from_linklib_cmd" | $SED "$delay_single_quote_subst"`'
 AR='`$ECHO "$AR" | $SED "$delay_single_quote_subst"`'
-lt_ar_flags='`$ECHO "$lt_ar_flags" | $SED "$delay_single_quote_subst"`'
 AR_FLAGS='`$ECHO "$AR_FLAGS" | $SED "$delay_single_quote_subst"`'
 archiver_list_spec='`$ECHO "$archiver_list_spec" | $SED "$delay_single_quote_subst"`'
 STRIP='`$ECHO "$STRIP" | $SED "$delay_single_quote_subst"`'
@@ -20301,6 +20421,7 @@ want_nocaseglob \
 DLLTOOL \
 sharedlib_from_linklib_cmd \
 AR \
+AR_FLAGS \
 archiver_list_spec \
 STRIP \
 RANLIB \
@@ -20460,6 +20581,8 @@ do
     "src/include/gallus_config.h") CONFIG_HEADERS="$CONFIG_HEADERS src/include/gallus_config.h" ;;
     "libtool") CONFIG_COMMANDS="$CONFIG_COMMANDS libtool" ;;
     "mk/vars.mk") CONFIG_FILES="$CONFIG_FILES mk/vars.mk" ;;
+    "mk/DPDK-build/Makefile.dpdk") CONFIG_FILES="$CONFIG_FILES mk/DPDK-build/Makefile.dpdk" ;;
+    "mk/DPDK-build/Makefile") CONFIG_FILES="$CONFIG_FILES mk/DPDK-build/Makefile" ;;
     "mk/doxygen.conf") CONFIG_FILES="$CONFIG_FILES mk/doxygen.conf" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "src/include/Makefile") CONFIG_FILES="$CONFIG_FILES src/include/Makefile" ;;
@@ -21042,7 +21165,6 @@ $as_echo "$as_me: executing $ac_file commands" >&6;}
     cat <<_LT_EOF >> "$cfgfile"
 #! $SHELL
 # Generated automatically by $as_me ($PACKAGE) $VERSION
-# Libtool was configured on host `(hostname || uname -n) 2>/dev/null | sed 1q`:
 # NOTE: Changes made to this file will be lost: look at ltmain.sh.
 
 # Provide generalized library-building support services.
@@ -21186,11 +21308,8 @@ sharedlib_from_linklib_cmd=$lt_sharedlib_from_linklib_cmd
 # The archiver.
 AR=$lt_AR
 
-# Flags to create an archive (by configure).
-lt_ar_flags=$lt_ar_flags
-
 # Flags to create an archive.
-AR_FLAGS=\${ARFLAGS-"\$lt_ar_flags"}
+AR_FLAGS=$lt_AR_FLAGS
 
 # How to feed a file listing to the archiver.
 archiver_list_spec=$lt_archiver_list_spec
@@ -21785,7 +21904,6 @@ fi
 
 
 sh mk/initdepend && ${MAKE} prerequisite
-
 if test $? -ne 0; then
     as_fn_error $? "Prerequisite failure." "$LINENO" 5
 fi

@@ -144,6 +144,26 @@ case $OS in
 	OS=darwin;;
 esac
 
+# checking CC
+TOOLCHAIN_TARGET=''
+if test -z "${CC}"; then
+    CC=gcc
+fi
+AC_MSG_CHECKING([toolchain target arch])
+_v=`${CC} -v 2>&1 | egrep '^Target:' | awk '{ print $NF }'`
+if test $? -eq 0 -a ! -z "${_v}"; then
+    case ${CC} in
+    	*gcc)
+	    TOOLCHAIN_TARGET=${_v};;
+    esac
+    if test -z "${TOOLCHAIN_TARGET}"; then
+        AC_MSG_RESULT([unknown, yet.])
+    else
+	AC_MSG_RESULT([${TOOLCHAIN_TARGET}])
+    fi
+fi
+AC_SUBST(TOOLCHAIN_TARGET)
+
 AC_SUBST(MAKE)
 AC_SUBST(OS_CPPFLAGS)
 AC_SUBST(OS_CFLAGS)
@@ -171,10 +191,11 @@ RUBY=ruby
 NKF=nkf
 UNITY_SRC_DIR=
 
+developer=no
 AC_ARG_ENABLE([developer],
 	[AC_HELP_STRING([--enable-developer],
 	 [enable build for developers, like unit tests [default is no]])]
-	 ,[developer="$withval"], [developer=no])
+	 ,[developer="$enableval"], [developer=no])
 
 if test "X${developer}" != "Xno"; then
   AC_CHECK_PROG([HAVE_NKF], [nkf], [yes], [])
@@ -269,6 +290,70 @@ AC_CHECK_FUNCS([strlcpy strlcat, pthread_mutex_timedlock])
 LIBS=${oLIBS}
 AC_CHECK_FUNC(strtold, [AC_DEFINE(HAVE_STRTOLD)])
 
+
+# use DPDK or not
+use_dpdk=no
+AC_ARG_WITH([dpdk],
+	[AC_HELP_STRING([--enable-dpdk],
+	 [enable DPDK. [default: no]])]
+	 ,[use_dpdk="$withval"], [use_dpdk=no])
+
+spdk_dir=''
+AC_ARG_ENABLE([spdk],
+	[AC_HELP_STRING([--with-spdk=/path/to/spdk],
+	 [specify SPDK installation directory (implies --with-dpdk.)])]
+	 ,[spdk_dir="$enableval"], [spdk_dir=''])
+if test "x${enable_spdk}" = "xyes" -o "x${enable_spdk}" = "xno"; then
+    spdk_dir=''
+fi
+if test ! -z "${spdk_dir}"; then
+    use_dpdk=yes
+fi
+
+# checking for DPDK
+DPDK_DIR=''
+if test "x${use_dpdk}" = "xyes"; then
+    AC_MSG_CHECKING([DPDK and the environmental variable])
+    if test ! -z "${RTE_SDK}" -a ! -z "${RTE_TARGET}"; then
+        if test -d "${RTE_SDK}" -a -d "${RTE_SDK}/${RTE_TARGET}"; then
+            DPDK_DIR="${RTE_SDK}/${RTE_TARGET}"
+	    AC_MSG_RESULT([available.])
+        else
+	    AC_MSG_RESULT([not available.])
+	    AC_MSG_ERROR([RTE_SDK and/or RTE_TARGET not properly set.])
+        fi
+    else
+	AC_MSG_RESULT([not available.])
+	AC_MSG_ERROR([RTE_SDK and/or RTE_TARGET not set.])
+    fi
+fi
+AC_SUBST(DPDK_DIR)
+
+# checking for SPDK
+SPDK_DIR=''
+if test ! -z "${spdk_dir}"; then
+    AC_MSG_CHECKING([SPDK])
+    if test -d "${spdk_dir}" -a -r "${spdk_dir}/include/spdk/config.h"; then
+        SPDK_DIR="${spdk_dir}"
+        AC_MSG_RESULT([available.])
+    else
+        AC_MSG_RESULT([not available.])
+	AC_MSG_ERROR([SPDK directory is not properly specified or not exists.])
+    fi
+fi
+AC_SUBST(SPDK_DIR)
+
+# checking for protoc
+HAVE_PROTOC=''
+AC_MSG_CHECKING([protoc])
+_v=`protoc --version 2>&1 | awk '{ print $1 }'`
+if test "x${_v}" = "xlibprotoc"; then
+    HAVE_PROTOC=yes
+    AC_MSG_RESULT([available.])
+else
+    AC_MSG_RESULT([not available.])
+fi
+AC_SUBST(HAVE_PROTOC)
 
 # check ssl library
 AC_CHECK_HEADER(openssl/ssl.h,, [AC_MSG_ERROR([openssl/ssl.h is required!])])
@@ -434,6 +519,8 @@ AC_SUBST(NUMA_LIBS)
 # emit.
 AC_CONFIG_FILES(
 	mk/vars.mk
+	mk/DPDK-build/Makefile.dpdk
+	mk/DPDK-build/Makefile
 	mk/doxygen.conf
 	Makefile
 	src/include/Makefile
@@ -492,7 +579,6 @@ AC_CONFIG_COMMANDS_POST([rm -rf ./config.log ./config.status.* autom4te.cache])
 AC_OUTPUT
 
 sh mk/initdepend && ${MAKE} prerequisite
-
 if test $? -ne 0; then
     AC_MSG_ERROR([Prerequisite failure.])
 fi

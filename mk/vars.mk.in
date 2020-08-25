@@ -59,12 +59,34 @@ __SITECONF__=.pre.
 include $(SITECONF_MK)
 endif
 
+TOOLCHAIN_TARGET	= @TOOLCHAIN_TARGET@
+
+DPDK_DIR		= @DPDK_DIR@
+ifneq ($(DPDK_DIR),)
+DPDK_MK			= $(shell ls $(MKRULESDIR)/dpdk.mk 2>/dev/null)
+ifdef DPDK_MK
+include $(DPDK_MK)
+endif
+DPDK_INCLUDE		= -I$(DPDK_DIR)/include
+endif
+
+SPDK_DIR		= @SPDK_DIR@
+ifneq ($(SPDK_DIR),)
+SPDK_INCLUDE		= -I@SPDK_DIR@/include
+SPDK_LIBS		= -L@SPDK_DIR@/lib -lspdk -lspdk_env_dpdk -lisal
+endif
+
+PCAP_LIBS		= @PCAP_LIBS@
+
 GALLUS_UTIL_LIB		= libgallus_util.la
 DEP_GALLUS_UTIL_LIB	= $(BUILD_LIBDIR)/$(GALLUS_UTIL_LIB)
 RUNPATH_GALLUS_UTIL_LIB	=	$(BUILD_LIBDIR)/.libs
 
 SUBMODULES	=
 
+ifdef TOOLCHAIN_TARGET
+CPPFLAGS	+= -I/usr/include/x86_64-linux-gnu
+endif
 CPPFLAGS	+= @OS_CPPFLAGS@
 CPPFLAGS	+= -I$(BUILD_INCDIR)
 
@@ -112,7 +134,8 @@ COMMON_CXXFLAGS	= -std=gnu++98 $(WARN_CXXFLAGS) $(DEBUG_CXXFLAGS) \
 CFLAGS		+= @OS_CFLAGS@ @CFLAGS@ $(COMMON_CFLAGS)
 CXXFLAGS	+= @OS_CFLAGS@ @CXXFLAGS@ $(COMMON_CXXFLAGS)
 
-LDFLAGS		+= @OS_LDFLAGS@ @OS_LIBS@ @LDFLAGS@
+LDFLAGS		+= -Wl,--as-needed \
+		   @OS_LDFLAGS@ @OS_LIBS@ @LDFLAGS@
 
 OBJS		?= $(filter-out $(SRCS),$(SRCS:.c=.lo)) \
 			$(filter-out $(SRCS),$(SRCS:.cc=.lo)) \
@@ -125,10 +148,11 @@ endif
 LTLINK_RPATH	= -rpath $(DEST_LIBDIR)
 LTLINK_RUNPATH	=
 LTLINK_RUNPATH	+= \
-	-R$(RUNPATH_GALLUS_UTIL_LIB)
+	-R $(DPDK_DIR)/lib \
+	-R $(SPDK_DIR)/lib \
+	-R $(RUNPATH_GALLUS_UTIL_LIB)
 
-LTLINK_RUNPATH	+= -R$(DEST_LIBDIR)
-
+LTLINK_RUNPATH	+= -R $(DEST_LIBDIR)
 
 STATICBUILD	=	@STATICBUILD@
 ifndef STATICBUILD
