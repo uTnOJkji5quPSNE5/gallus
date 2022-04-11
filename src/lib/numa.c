@@ -32,6 +32,7 @@ typedef void	(*numa_free_proc_t)(void *p);
 
 
 static pthread_once_t s_once = PTHREAD_ONCE_INIT;
+static bool s_is_inited = false;
 
 static void	s_init_numa_thingies(void);
 static void	s_final_numa_thingies(void);
@@ -64,6 +65,7 @@ static void	s_uma_free(void *p);
 static void
 s_once_proc(void) {
   s_init_numa_thingies();
+  s_is_inited = true;
 }
 
 
@@ -87,7 +89,9 @@ s_final(void) {
 
 static void
 s_dtors(void) {
-  s_final();
+  if (s_is_inited == true) {
+    s_final();
+  }
 }
 
 
@@ -169,15 +173,15 @@ s_init_numa_thingies(void) {
 
 
 static bool
-s_free_all(void *key, void *val, gallus_hashentry_t he, void *arg) {
-  void *addr = key;
+s_free_all(const void *key, void *val, gallus_hashentry_t he, void *arg) {
+  const void *addr = key;
   size_t sz = (size_t)val;
 
   (void)he;
   (void)arg;
 
   if (likely(addr != NULL && sz > 0)) {
-    numa_free(addr, sz);
+    numa_free((void *)addr, sz);
   }
 
   return true;

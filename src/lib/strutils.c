@@ -21,6 +21,7 @@
 
 
 static pthread_once_t s_once = PTHREAD_ONCE_INIT;
+static bool s_is_inited = false;
 
 static MP_INT s_0;
 static MP_INT s_1;
@@ -185,6 +186,7 @@ s_once_proc(void) {
     gallus_exit_fatal("can't initialize ULLONG_MAX to an MP_INT.\n");
   }
 
+  s_is_inited = true;
 }
 
 
@@ -236,14 +238,16 @@ s_final(void) {
 
 static void
 s_dtors(void) {
-  if (gallus_module_is_unloading() &&
-      gallus_module_is_finalized_cleanly()) {
-    s_final();
+  if (s_is_inited == true) {
+    if (gallus_module_is_unloading() &&
+        gallus_module_is_finalized_cleanly()) {
+      s_final();
 
-    gallus_msg_debug(5, "The string utility module finalized.\n");
-  } else {
-    gallus_msg_debug(10, "The string utility module is not finalized"
-                      "because of module finalization problem.\n");
+      gallus_msg_debug(5, "The string utility module finalized.\n");
+    } else {
+      gallus_msg_debug(10, "The string utility module is not finalized "
+                    "because of module finalization problem.\n");
+    }
   }
 }
 
@@ -1441,8 +1445,11 @@ gallus_str_trim_right(const char *org, const char *trimchars,
         }
       }
 
-      *retptr = buf;
-      n = (gallus_result_t)strlen(buf);
+      if ((n = (gallus_result_t)strlen(buf)) > 0) {
+        *retptr = buf;
+      } else {
+        free(buf);
+      }
     } else {
       n = GALLUS_RESULT_NO_MEMORY;
     }
@@ -1474,13 +1481,13 @@ gallus_str_trim_left(const char *org, const char *trimchars,
       }
     }
 
-    buf = strdup(st);
-
-    if (buf != NULL) {
-      *retptr = buf;
-      n = (gallus_result_t)strlen(buf);
-    } else {
-      n = GALLUS_RESULT_NO_MEMORY;
+    if ((n = (gallus_result_t)strlen(st)) > 0) {
+      buf = strdup(st);
+      if (buf != NULL) {
+        *retptr = buf;
+      } else {
+        n = GALLUS_RESULT_NO_MEMORY;
+      }
     }
   } else {
     n = GALLUS_RESULT_INVALID_ARGS;

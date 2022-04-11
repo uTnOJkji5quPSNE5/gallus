@@ -159,9 +159,13 @@
 #include <poll.h>
 #endif /* HAVE_POLL_H */
 
-#ifdef HAVE_SYS_SOCKET_H
-#include <sys/socket.h>
-#endif /* HAVE_SYS_SOCKET_H */
+#ifdef HAVE_SYS_MMAN_H
+#include <sys/mman.h>
+#endif /* HAVE_SYS_MMAN_H */
+
+#ifdef HAVE_SYS_PRCTL_H
+#include <sys/prctl.h>
+#endif /* HAVE_SYS_PRCTL_H */
 
 #ifdef HAVE_NUMA_H
 #include <numa.h>

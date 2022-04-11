@@ -20,7 +20,7 @@ typedef struct gallus_statistic_struct {
 
 
 static pthread_once_t s_once = PTHREAD_ONCE_INIT;
-
+static bool s_is_inited = false;
 static gallus_hashmap_t s_stat_tbl;
 
 
@@ -49,6 +49,8 @@ s_once_proc(void) {
     gallus_perror(r);
     gallus_exit_fatal("can't initialize the stattistics table.\n");
   }
+
+  s_is_inited = true;
 }
 
 
@@ -74,14 +76,16 @@ s_final(void) {
 
 static void
 s_dtors(void) {
-  if (gallus_module_is_unloading() &&
-      gallus_module_is_finalized_cleanly()) {
-    s_final();
+  if (s_is_inited == true) {
+    if (gallus_module_is_unloading() &&
+        gallus_module_is_finalized_cleanly()) {
+      s_final();
 
-    gallus_msg_debug(10, "The stattitics module is finalized.\n");
-  } else {
-    gallus_msg_debug(10, "The stattitics module is not finalized "
-                      "because of module finalization problem.\n");
+      gallus_msg_debug(10, "The stattitics module is finalized.\n");
+    } else {
+      gallus_msg_debug(10, "The stattitics module is not finalized "
+                    "because of module finalization problem.\n");
+    }
   }
 }
 

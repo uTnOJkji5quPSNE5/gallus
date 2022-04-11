@@ -25,13 +25,15 @@ distclean::	clean
 		mk/changeincludes mk/changename mk/initdepend \
 		src/include/gallus_ecode.h \
 		src/lib/ecode.c \
-		mk/dpdk.mk mk/DPDK-build/Makefile
+		mk/dpdk.mk mk/DPDK-build/Makefile \
+		src/lib/check/Makefile
 	find . -type f \( \
 		-name '.depend' \
 	\) | xargs $(RM)
 	find . -type d \( \
 		-name '.libs' \
 	\) | xargs $(RM) -r
+		$(RM) src/lib/check/Makefile
 
 ultimateclean:	distclean
 	@git clean -n -f -d -x | \

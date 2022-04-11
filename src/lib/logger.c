@@ -39,6 +39,25 @@ static int const s_syslog_priorities[] = {
 };
 
 
+static struct flock s_fl_lck = {
+  .l_type = F_WRLCK,
+  .l_start = 0,
+  .l_whence = SEEK_SET,
+  .l_len = 0,
+  .l_pid = 0,
+};
+
+static struct flock s_fl_unl = {
+  .l_type = F_UNLCK,
+  .l_start = 0,
+  .l_whence = SEEK_SET,
+  .l_len = 0,
+  .l_pid = 0,
+};
+
+static volatile bool s_is_fd_locked = false;
+
+
 
 
 
@@ -53,37 +72,32 @@ s_child_at_fork(void) {
 
 static inline void
 s_lock_fd(FILE *fd, bool cmd) {
-  if (fd != NULL) {
-    struct flock fl;
-
-    fl.l_type = (cmd == true) ? F_WRLCK : F_UNLCK;
-    fl.l_start = 0;
-    fl.l_whence = SEEK_SET;
-    fl.l_len = 0;	/* Entire lock. */
-    fl.l_pid = 0;
-
-    (void)fcntl(fileno(fd), F_SETLKW, &fl);
+  if (likely(fd != NULL)) {
+    (void)fcntl(fileno(fd), F_SETLKW,
+                cmd == true ? &s_fl_lck : &s_fl_unl);
   }
 }
 
 
 static inline void
 s_lock(void) {
-  (void)pthread_mutex_lock(&s_log_lock);
-  if (s_do_multi_process == true &&
-      s_log_dst == GALLUS_LOG_EMIT_TO_FILE &&
-      s_log_fd != NULL) {
-    s_lock_fd(s_log_fd, true);
+  if (likely(s_do_multi_process == true &&
+             s_log_dst == GALLUS_LOG_EMIT_TO_FILE &&
+             s_log_fd != NULL)) {
+    (void)pthread_mutex_lock(&s_log_lock);
+    if (likely(s_is_fd_locked == false)) {
+      s_lock_fd(s_log_fd, true);
+      s_is_fd_locked = true;
+    }
   }
 }
 
 
 static inline void
 s_unlock(void) {
-  if (s_do_multi_process == true &&
-      s_log_dst == GALLUS_LOG_EMIT_TO_FILE &&
-      s_log_fd != NULL) {
+  if (likely(s_is_fd_locked == true)) {
     s_lock_fd(s_log_fd, false);
+    s_is_fd_locked = false;
   }
   (void)pthread_mutex_unlock(&s_log_lock);
 }
@@ -248,21 +262,21 @@ s_do_log(gallus_log_level_t l, const char *msg) {
   (void)pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &o_cancel_state);
 
   s_lock();
-
-  switch (s_log_dst) {
-    case GALLUS_LOG_EMIT_TO_FILE:
-    case GALLUS_LOG_EMIT_TO_UNKNOWN: {
-      fd = (s_log_fd != NULL) ? s_log_fd : stderr;
-      (void)fprintf(fd, "%s", msg);
-      (void)fflush(fd);
-      break;
-    }
-    case GALLUS_LOG_EMIT_TO_SYSLOG: {
-      int prio = s_get_syslog_priority(l);
-      syslog(prio, "%s", msg);
+  {
+    switch (s_log_dst) {
+      case GALLUS_LOG_EMIT_TO_FILE:
+      case GALLUS_LOG_EMIT_TO_UNKNOWN: {
+        fd = (s_log_fd != NULL) ? s_log_fd : stderr;
+        (void)fprintf(fd, "%s", msg);
+        (void)fflush(fd);
+        break;
+      }
+      case GALLUS_LOG_EMIT_TO_SYSLOG: {
+        int prio = s_get_syslog_priority(l);
+        syslog(prio, "%s", msg);
+      }
     }
   }
-
   s_unlock();
 
   (void)pthread_setcancelstate(o_cancel_state, NULL);
@@ -307,9 +321,9 @@ gallus_log_emit(gallus_log_level_t lv,
     st = -1;
 #endif /* HAVE_PTHREAD_SETNAME_NP */
 #if SIZEOF_PTHREAD_T == SIZEOF_INT64_T
-#define TIDFMT "0x" PFTIDS(016, x)
+#define TIDFMT "0x" GALLUSIDS(016, x)
 #elif SIZEOF_PTHREAD_T == SIZEOF_INT
-#define TIDFMT "0x" PFTIDS(08, x)
+#define TIDFMT "0x" GALLUSIDS(08, x)
 #endif /* SIZEOF_PTHREAD_T == SIZEOF_INT64_T ... */
     if (st == 0 && IS_VALID_STRING(thd_name) == true) {
       snprintf(thd_info_buf, sizeof(thd_info_buf), "[%u:" TIDFMT ":%s]",
@@ -435,11 +449,35 @@ gallus_log_get_destination(const char **arg) {
 }
 
 
+void
+gallus_log_set_multi_process(bool v) {
+  if (s_log_dst == GALLUS_LOG_EMIT_TO_FILE) {
+    (void)pthread_mutex_lock(&s_log_lock);
+    s_do_multi_process = v;
+    (void)pthread_mutex_unlock(&s_log_lock);
+    gallus_msg_debug(5, "set logger multi-process mode %s.\n",
+                  v == true ? "on" : "off");
+  }
+}
+
+
+gallus_result_t
+gallus_log_get_multi_process(bool *v) {
+  if (v != NULL) {
+    (void)pthread_mutex_lock(&s_log_lock);
+    *v = s_do_multi_process;
+    (void)pthread_mutex_unlock(&s_log_lock);    
+  }
+
+  return GALLUS_RESULT_OK;
+}
+
+
 
 
 
 static pthread_once_t s_once = PTHREAD_ONCE_INIT;
-
+static bool s_is_inited = false;
 static void s_ctors(void) __attr_constructor__(104);
 static void s_dtors(void) __attr_destructor__(104);
 
@@ -519,6 +557,8 @@ s_once_proc(void) {
                       gallus_get_command_name());
   }
 #endif /* HAVE_PROCFS_SELF_EXE */
+
+  s_is_inited = true;
 }
 
 
@@ -536,6 +576,8 @@ s_ctors(void) {
 
 static void
 s_dtors(void) {
-  gallus_log_finalize();
+  if (s_is_inited == true) {
+    gallus_log_finalize();
+  }
 }
 

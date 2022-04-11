@@ -1,7 +1,7 @@
 TOPDIR		= @TOPDIR@
 MKRULESDIR	= @MKRULESDIR@
 
-DIRS	=	check test
+DIRS	=	test
 
 include $(MKRULESDIR)/vars.mk
 
@@ -16,7 +16,8 @@ SRCS =	error.c logger.c hashmap.c chrono.c lock.c thread.c \
 	strutils.c cbuffer.c qmuxer.c qpoll.c \
 	heapcheck.c signal.c session.c session_tcp.c session_tls.c \
 	pipeline_stage.c gstate.c module.c runnable.c dstring.c \
-	argv0.c ip_addr.c callout.c mainloop.c statistic.c numa.c 
+	argv0.c ip_addr.c callout.c mainloop.c statistic.c numa.c \
+	poolable.c pool.c pooled_thread.c task.c
 ifneq (${OSDEF},GALLUS_OS_LINUX)
 SRCS +=	qsort.c
 endif

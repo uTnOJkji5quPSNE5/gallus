@@ -72,7 +72,7 @@ s_do_iterate(gallus_hashmap_t hm,
 
 
 static inline gallus_hashentry_t
-s_find_entry(gallus_hashmap_t hm, void *key) {
+s_find_entry(gallus_hashmap_t hm, const void *key) {
   gallus_hashentry_t ret = NULL;
 
   if (hm != NULL) {
@@ -84,7 +84,7 @@ s_find_entry(gallus_hashmap_t hm, void *key) {
 
 
 static inline gallus_hashentry_t
-s_create_entry(gallus_hashmap_t hm, void *key) {
+s_create_entry(gallus_hashmap_t hm, const void *key) {
   gallus_hashentry_t ret = NULL;
 
   if (hm != NULL) {
@@ -97,7 +97,7 @@ s_create_entry(gallus_hashmap_t hm, void *key) {
 
 
 static bool
-s_freeup_proc(void *key, void *val, gallus_hashentry_t he, void *arg) {
+s_freeup_proc(const void *key, void *val, gallus_hashentry_t he, void *arg) {
   bool ret = false;
   (void)key;
   (void)he;
@@ -288,7 +288,7 @@ gallus_hashmap_clear_no_lock(gallus_hashmap_t *hmptr, bool free_values) {
 
 static inline gallus_result_t
 s_find(gallus_hashmap_t *hmptr,
-       void *key, void **valptr) {
+       const void *key, void **valptr) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
   gallus_hashentry_t he;
 
@@ -311,7 +311,7 @@ s_find(gallus_hashmap_t *hmptr,
 
 gallus_result_t
 gallus_hashmap_find_no_lock(gallus_hashmap_t *hmptr,
-                             void *key, void **valptr) {
+			 const void *key, void **valptr) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (hmptr != NULL &&
@@ -329,7 +329,7 @@ gallus_hashmap_find_no_lock(gallus_hashmap_t *hmptr,
 
 
 gallus_result_t
-gallus_hashmap_find(gallus_hashmap_t *hmptr, void *key, void **valptr) {
+gallus_hashmap_find(gallus_hashmap_t *hmptr, const void *key, void **valptr) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (hmptr != NULL &&
@@ -356,7 +356,7 @@ gallus_hashmap_find(gallus_hashmap_t *hmptr, void *key, void **valptr) {
 
 static inline gallus_result_t
 s_add(gallus_hashmap_t *hmptr,
-      void *key, void **valptr,
+      const void *key, void **valptr,
       bool allow_overwrite) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
   void *oldval = NULL;
@@ -392,8 +392,8 @@ s_add(gallus_hashmap_t *hmptr,
 
 gallus_result_t
 gallus_hashmap_add(gallus_hashmap_t *hmptr,
-                    void *key, void **valptr,
-                    bool allow_overwrite) {
+		const void *key, void **valptr,
+		bool allow_overwrite) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (hmptr != NULL &&
@@ -417,8 +417,8 @@ gallus_hashmap_add(gallus_hashmap_t *hmptr,
 
 gallus_result_t
 gallus_hashmap_add_no_lock(gallus_hashmap_t *hmptr,
-                            void *key, void **valptr,
-                            bool allow_overwrite) {
+			const void *key, void **valptr,
+			bool allow_overwrite) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (hmptr != NULL &&
@@ -440,7 +440,7 @@ gallus_hashmap_add_no_lock(gallus_hashmap_t *hmptr,
 
 static inline gallus_result_t
 s_delete(gallus_hashmap_t *hmptr,
-         void *key, void **valptr,
+         const void *key, void **valptr,
          bool free_value) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
   void *val = NULL;
@@ -472,8 +472,8 @@ s_delete(gallus_hashmap_t *hmptr,
 
 gallus_result_t
 gallus_hashmap_delete(gallus_hashmap_t *hmptr,
-                       void *key, void **valptr,
-                       bool free_value) {
+		   const void *key, void **valptr,
+		   bool free_value) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (hmptr != NULL &&
@@ -496,8 +496,8 @@ gallus_hashmap_delete(gallus_hashmap_t *hmptr,
 
 gallus_result_t
 gallus_hashmap_delete_no_lock(gallus_hashmap_t *hmptr,
-                               void *key, void **valptr,
-                               bool free_value) {
+			   const void *key, void **valptr,
+			   bool free_value) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (hmptr != NULL &&

@@ -11,6 +11,13 @@
 
 #define DEFAULT_PIDFILE_DIR	"/var/run/"
 
+#if defined(GALLUS_OS_LINUX) && defined(HAVE_SYS_PRCTL_H)
+#define USE_PRCTL
+#endif /* defined(GALLUS_OS_LINUX) && defined(HAVE_SYS_PRCTL_H) */
+
+
+#define PARENT_EXIT_WAIT_TIMEOUT	ONE_SEC
+
 
 
 
@@ -55,6 +62,204 @@ static gallus_chrono_t s_shutdown_timeout =
 static gallus_thread_t s_thd = NULL;
 static mainloop_args_t s_args = { NULL };
 
+static bool s_org_multi_proc_mode = false;
+
+#ifdef USE_PRCTL
+
+static gallus_mutex_t s_parent_sync_lck = NULL;
+static gallus_cond_t s_parent_sync_cnd = NULL;
+static volatile bool s_is_parent_exit = false;
+static bool s_is_inited = false;
+static pthread_once_t s_once = PTHREAD_ONCE_INIT;
+
+static void s_ctors(void) __attr_constructor__(114);
+static void s_dtors(void) __attr_destructor__(114);
+
+static void
+s_once_proc(void) {
+  gallus_result_t r;
+
+  if ((r = gallus_mutex_create(&s_parent_sync_lck)) != GALLUS_RESULT_OK) {
+    gallus_perror(r);
+    gallus_exit_fatal("can't initialize the parent sync mutex.\n");
+  }
+
+  if ((r = gallus_cond_create(&s_parent_sync_cnd)) != GALLUS_RESULT_OK) {
+    gallus_perror(r);
+    gallus_exit_fatal("can't initialize the parent sync cond.\n");
+  }
+
+  s_is_inited = true;
+}
+
+
+static inline void
+s_init(void) {
+  (void)pthread_once(&s_once, s_once_proc);
+}
+
+
+static void
+s_ctors(void) {
+  s_init();
+}
+
+
+static inline void
+s_final(void) {
+  if (s_parent_sync_cnd != NULL) {
+    (void)gallus_cond_destroy(&s_parent_sync_cnd);
+  }
+  if (s_parent_sync_lck != NULL) {
+    (void)gallus_mutex_destroy(&s_parent_sync_lck);
+  }
+}
+
+
+static void
+s_dtors(void) {
+  if (s_is_inited == true) {
+    if (gallus_module_is_unloading() &&
+        gallus_module_is_finalized_cleanly()) {
+      s_final();
+    }
+  }
+}
+
+
+static void
+s_temp_USR1_handler(int sig) {
+  if (sig == SIGUSR1) {
+    (void)gallus_mutex_lock(&s_parent_sync_lck);
+    {
+      s_is_parent_exit = true;
+      (void)gallus_cond_notify(&s_parent_sync_cnd, true);
+    }
+    (void)gallus_mutex_unlock(&s_parent_sync_lck);
+  }
+}
+
+
+static inline gallus_result_t
+s_wait_parent_exit(void) {
+  gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
+  pid_t ppid = getppid();
+  gallus_chrono_t stop;
+  gallus_chrono_t now;
+
+  WHAT_TIME_IS_IT_NOW_IN_NSEC(stop);
+  stop += PARENT_EXIT_WAIT_TIMEOUT;	/* 1 sec. */
+
+  gallus_msg_debug(5, "Waiting parent %d exit ...\n", ppid);
+
+  (void)gallus_mutex_lock(&s_parent_sync_lck);
+  {
+    errno = 0;
+    while (s_is_parent_exit == false) {
+      WHAT_TIME_IS_IT_NOW_IN_NSEC(now);
+      if (now < stop) {
+        errno = 0;
+        if (kill(ppid, 0) == 0) {
+          ret = gallus_cond_wait(&s_parent_sync_cnd, &s_parent_sync_lck,
+                              100LL * 1000LL * 1000LL /* 100ms. */);
+          continue;
+        } else {
+          if (errno == ESRCH) {
+            ret = GALLUS_RESULT_OK;
+          } else {
+            ret = GALLUS_RESULT_POSIX_API_ERROR;
+            gallus_perror(ret);
+          }
+          break;
+        }
+      }
+    }
+  }
+  (void)gallus_mutex_unlock(&s_parent_sync_lck);
+
+  gallus_msg_debug(5, "Waiting parent %d exit ... done: %s.\n",
+                ppid, gallus_error_get_string(ret));
+
+  (void)gallus_signal(SIGUSR1, SIG_DFL, NULL);
+
+  return ret;
+}
+
+
+static inline gallus_result_t
+s_prepare_wait_parent_exit(void) {
+  gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
+  pid_t ppid = getppid();
+
+  if (kill(ppid, 0) == 0) {
+    (void)gallus_signal(SIGUSR1, s_temp_USR1_handler, NULL);
+    if (prctl(PR_SET_PDEATHSIG, SIGUSR1) == 0) {
+      ret = GALLUS_RESULT_OK;
+    } else {
+      ret = GALLUS_RESULT_NOT_FOUND;
+      gallus_perror(ret);
+    }
+  } else {
+    ret = GALLUS_RESULT_NOT_FOUND;
+  }
+
+  return ret;
+}
+
+
+#else
+
+
+static inline gallus_result_t
+s_wait_parent_exit(void) {
+  gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
+  pid_t ppid = getppid();
+  gallus_chrono_t stop;
+  gallus_chrono_t now;
+
+  WHAT_TIME_IS_IT_NOW_IN_NSEC(stop);
+  stop += PARENT_EXIT_WAIT_TIMEOUT;	/* 1 sec. */
+
+  while (s_is_parent_exit == false) {
+    WHAT_TIME_IS_IT_NOW_IN_NSEC(now);
+    if (now < stop) {
+        errno = 0;
+        if (kill(ppid, 0) == 0) {
+          continue;
+        } else {
+          if (errno == ESRCH) {
+            ret = GALLUS_RESULT_OK;
+          } else {
+            ret = GALLUS_RESULT_POSIX_API_ERROR;
+            gallus_perror(ret);
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  return ret;
+}
+
+
+static inline gallus_result_t
+s_prepare_wait_parent_exit(void) {
+  gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
+  pid_t ppid = getppid();
+
+  if (kill(ppid, 0) == 0) {
+    ret = GALLUS_RESULT_OK;
+  } else {
+    ret = GALLUS_RESULT_NOT_FOUND;
+  }
+
+  return ret;
+}
+
+
+#endif /* USE_PRCTL */
+
 
 
 
@@ -62,29 +267,32 @@ static mainloop_args_t s_args = { NULL };
 static inline pid_t
 s_setsid(void) {
   pid_t ret = (pid_t)-1;
+
+#if 0
   int fd = open("/dev/tty", O_RDONLY);
 
   if (fd >= 0) {
-    (void)close(fd);
-    if ((ret = setsid()) < 0) {
 #ifdef TIOCNOTTY
-      int one = 1;
-      fd = open("/dev/tty", O_RDONLY);
-      if (fd >= 0) {
-        (void)ioctl(fd, TIOCNOTTY, &one);
-      }
+    int one = 1;
+    (void)ioctl(fd, TIOCNOTTY, &one);
 #endif /* TIOCNOTTY */
-      (void)close(fd);
-      ret = getpid();
-      (void)setpgid(0, ret);
-    }
-  } else {
-    if ((ret = setsid()) < 0) {
-      ret = getpid();
-      (void)setpgid(0, ret);
+    (void)close(fd);
+  }
+#endif
+
+  errno = 0;
+  if (unlikely((ret = setsid()) < 0)) {
+    perror("setsid");
+    errno = 0;
+    if (likely(setpgid(0, 0) == 0)) {
+      errno = 0;
+      ret = getpgrp();
+    } else {
+      perror("getpgrp");
+      ret = (pid_t)-1;
     }
   }
-
+  
   return ret;
 }
 
@@ -372,8 +580,16 @@ done:
     st = 1;
   }
   if (s_do_fork == true && ipcfd >= 0) {
+    (void)s_prepare_wait_parent_exit();
     (void)write(ipcfd, &st, sizeof(int));
     (void)close(ipcfd);
+    ret = s_wait_parent_exit();
+    if (ret == GALLUS_RESULT_OK) {
+      (void)gallus_log_set_multi_process(s_org_multi_proc_mode);
+    } else {
+      gallus_msg_warning("Wainting exit of parent process failed.\n");
+      ret = GALLUS_RESULT_OK;
+    }
   }
 
   return ret;
@@ -447,8 +663,10 @@ s_default_mainloop(int argc, const char * const argv[],
     ret = s_prologue(argc, argv, pre_hook, post_hook, ipcfd);
     if (likely(ret == GALLUS_RESULT_OK &&
                s_do_abort == false)) {
-      gallus_msg_info("%s: Entering the main loop.\n",
+
+      gallus_msg_info("%s is go and entering the main loop.\n",
                        gallus_get_command_name());
+
       while ((ret = s_default_idle_proc()) == GALLUS_RESULT_TIMEDOUT) {
         gallus_msg_debug(10, "%s: Wainitg for the shutdown request...\n",
                           gallus_get_command_name());
@@ -526,7 +744,9 @@ s_callout_mainloop(int argc, const char * const argv[],
           gallus_result_t r1 = GALLUS_RESULT_ANY_FAILURES;
           gallus_result_t r2 = GALLUS_RESULT_ANY_FAILURES;
 
-          gallus_msg_info("%s is a go.\n", gallus_get_command_name());
+
+          gallus_msg_info("%s is go and entering the main loop.\n",
+                       gallus_get_command_name());
 
           /*
            * Start the callout handler main loop.
@@ -569,7 +789,7 @@ s_set_failsafe_handler(int sig) {
 
   if (gallus_signal(sig, SIG_CUR, &h) == GALLUS_RESULT_OK) {
     if (h == NULL || h == SIG_DFL || h == SIG_IGN) {
-      gallus_result_t r = gallus_signal(SIGQUIT, s_term_handler, NULL);
+      gallus_result_t r = gallus_signal(sig, s_term_handler, NULL);
       if (r == GALLUS_RESULT_OK) {
         gallus_msg_warning("The signal %d seems not to be properly handled. "
                             "Set a decent handler.\n", sig);
@@ -614,6 +834,14 @@ s_do_mainloop(mainloop_proc_t mainloopproc,
       if (likely(st == 0)) {
         pid_t pid;
 
+        /*
+         * Set logger to lock file for parent/child simultaneous
+         * logging forcibly fo now, then reset it to original mode
+         * after the parent exits.
+         */
+        (void)gallus_log_get_multi_process(&s_org_multi_proc_mode);
+        (void)gallus_log_set_multi_process(true);
+        
         errno = 0;
         pid = fork();
         if (pid > 0) {

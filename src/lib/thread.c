@@ -13,6 +13,7 @@
 
 
 static pthread_once_t s_once = PTHREAD_ONCE_INIT;
+static bool s_is_inited = false;
 static pthread_attr_t s_attr;
 static gallus_hashmap_t s_thd_tbl;
 static gallus_hashmap_t s_alloc_tbl;
@@ -67,6 +68,8 @@ s_once_proc(void) {
   }
 
   (void)pthread_atfork(NULL, NULL, s_child_at_fork);
+
+  s_is_inited = true;
 }
 
 
@@ -94,14 +97,16 @@ s_final(void) {
 
 static void
 s_dtors(void) {
-  if (gallus_module_is_unloading() &&
-      gallus_module_is_finalized_cleanly()) {
-    s_final();
+  if (s_is_inited == true) {
+    if (gallus_module_is_unloading() &&
+        gallus_module_is_finalized_cleanly()) {
+      s_final();
 
-    gallus_msg_debug(10, "The thread module is finalized.\n");
-  } else {
-    gallus_msg_debug(10, "The thread module is not finalized "
-                      "because of module finalization problem.\n");
+      gallus_msg_debug(10, "The thread module is finalized.\n");
+    } else {
+      gallus_msg_debug(10, "The thread module is not finalized "
+                    "because of module finalization problem.\n");
+    }
   }
 }
 
@@ -201,6 +206,7 @@ s_cancel_unlock(const gallus_thread_t thd) {
 
 static inline gallus_result_t
 s_initialize(gallus_thread_t thd,
+	     bool is_allocd,
              gallus_thread_main_proc_t mainproc,
              gallus_thread_finalize_proc_t finalproc,
              gallus_thread_freeup_proc_t freeproc,
@@ -226,6 +232,7 @@ s_initialize(gallus_thread_t thd,
         ((ret = gallus_cond_create(&(thd->m_finalize_cond))) ==
          GALLUS_RESULT_OK)) {
       thd->m_arg = arg;
+      thd->m_is_allocd = is_allocd;
       if (IS_VALID_STRING(name) == true) {
         snprintf(thd->m_name, sizeof(thd->m_name), "%s", name);
       }
@@ -273,7 +280,7 @@ s_finalize(gallus_thread_t thd, bool is_canceled,
                                          &o_cancel_state);
       {
 
-        gallus_msg_debug(5, "enter: %s\n",
+        gallus_msg_debug(10, "enter: %s\n",
                           (is_canceled == true) ? "canceled" : "exit");
 
         s_cancel_lock(thd);
@@ -338,12 +345,13 @@ static inline void
 s_delete(gallus_thread_t thd) {
   if (thd != NULL) {
     if (s_is_thd(thd) == true) {
-      if (s_is_alloc_marked(thd) == true) {
-        gallus_msg_debug(5, "free %p\n", (void *)thd);
+      if (thd->m_is_allocd == true ||
+          s_is_alloc_marked(thd) == true) {
+        gallus_msg_debug(10, "free %p\n", (void *)thd);
         free((void *)thd);
       } else {
         if (gallus_heapcheck_is_in_heap((const void *)thd) == true) {
-          gallus_msg_debug(5, "%p is a thread object NOT allocated by the "
+          gallus_msg_debug(10, "%p is a thread object NOT allocated by the "
                             "gallus_thread_create(). If you want to free(3) "
                             "this by calling the gallus_thread_destroy(), "
                             "call gallus_thread_free_when_destroy(%p).\n",
@@ -353,7 +361,6 @@ s_delete(gallus_thread_t thd) {
                             "seems not in the heap area.\n", (void *)thd);
         }
       }
-
       s_delete_thd(thd);
     }
   }
@@ -520,23 +527,27 @@ s_pthd_entry_point(void *ptr) {
 
 gallus_result_t
 gallus_thread_create_with_size(gallus_thread_t *thdptr,
-                                size_t alloc_size,
-                                gallus_thread_main_proc_t mainproc,
-                                gallus_thread_finalize_proc_t finalproc,
-                                gallus_thread_freeup_proc_t freeproc,
-                                const char *name,
-                                void *arg) {
+			    size_t alloc_size,
+			    gallus_thread_main_proc_t mainproc,
+			    gallus_thread_finalize_proc_t finalproc,
+			    gallus_thread_freeup_proc_t freeproc,
+			    const char *name,
+			    void *arg) {
   gallus_result_t ret = GALLUS_RESULT_ANY_FAILURES;
 
   if (thdptr != NULL &&
       mainproc != NULL) {
     gallus_thread_t thd;
+    size_t sz = alloc_size;
+    bool is_allocd = false;
 
     if (*thdptr == NULL) {
-      size_t sz = (DEFAULT_THREAD_ALLOC_SZ > alloc_size) ?
-          DEFAULT_THREAD_ALLOC_SZ : alloc_size;
+      if (sz < DEFAULT_THREAD_ALLOC_SZ) {
+        sz = DEFAULT_THREAD_ALLOC_SZ;
+      }
       thd = (gallus_thread_t)malloc(sz);
       if (thd != NULL) {
+        (void)memset(thd, 0, sz);
         *thdptr = thd;
         s_alloc_mark_thd(thd);
       } else {
@@ -544,11 +555,13 @@ gallus_thread_create_with_size(gallus_thread_t *thdptr,
         ret = GALLUS_RESULT_NO_MEMORY;
         goto done;
       }
+      is_allocd = true;
     } else {
       thd = *thdptr;
     }
 
-    ret = s_initialize(thd, mainproc, finalproc, freeproc, name, arg);
+    ret = s_initialize(thd, is_allocd,
+		       mainproc, finalproc, freeproc, name, arg);
     if (ret != GALLUS_RESULT_OK) {
       s_destroy(&thd, false);
     }
@@ -569,9 +582,9 @@ gallus_thread_create(gallus_thread_t *thdptr,
                       gallus_thread_freeup_proc_t freeproc,
                       const char *name,
                       void *arg) {
-  return gallus_thread_create_with_size(thdptr, 0,
-                                         mainproc, finalproc, freeproc,
-                                         name, arg);
+  return gallus_thread_create_with_size(thdptr, DEFAULT_THREAD_ALLOC_SZ,
+                                     mainproc, finalproc, freeproc,
+                                     name, arg);
 }
 
 
@@ -940,6 +953,8 @@ gallus_thread_set_cpu_affinity(const gallus_thread_t *thdptr,
 
   return ret;
 #else
+  (void)thdptr;
+  (void)cpu;
   return GALLUS_RESULT_OK;
 #endif /* HAVE_PTHREAD_SETAFFINITY_NP */
 }
@@ -981,9 +996,9 @@ gallus_thread_get_cpu_affinity(const gallus_thread_t *thdptr) {
             if (cpu != -INT_MAX) {
 
 #if SIZEOF_PTHREAD_T == SIZEOF_INT64_T
-#define TIDFMT "0x" PFTIDS(016, x)
+#define TIDFMT "0x" GALLUSIDS(016, x)
 #elif SIZEOF_PTHREAD_T == SIZEOF_INT
-#define TIDFMT "0x" PFTIDS(08, x)
+#define TIDFMT "0x" GALLUSIDS(08, x)
 #endif /* SIZEOF_PTHREAD_T == SIZEOF_INT64_T ... */
 
               if ((*thdptr)->m_cpusetptr != NULL &&
@@ -1057,6 +1072,7 @@ gallus_thread_get_cpu_affinity(const gallus_thread_t *thdptr) {
 
   return ret;
 #else
+  (void)thdptr;
   return 0;
 #endif /* HAVE_PTHREAD_SETAFFINITY_NP */
 }
@@ -1198,6 +1214,51 @@ gallus_thread_is_valid(const gallus_thread_t *thdptr,
   }
 
   return ret;
+}
+
+
+gallus_result_t
+gallus_thread_get_name(const gallus_thread_t *thdptr, char *buf, size_t n) {
+  if (likely(thdptr != NULL && *thdptr != NULL && buf != NULL && n > 0 &&
+             IS_VALID_STRING((*thdptr)->m_name) == true)) {
+
+    s_op_lock(*thdptr);
+    {
+
+      (void)snprintf(buf, n, "%s", (*thdptr)->m_name);
+
+    }
+    s_op_unlock(*thdptr);
+    
+    return GALLUS_RESULT_OK;
+  } else {
+    return GALLUS_RESULT_INVALID_ARGS;
+  }
+}
+
+
+gallus_result_t
+gallus_thread_set_name(const gallus_thread_t *thdptr, const char *name) {
+  if (likely(thdptr != NULL && *thdptr != NULL && 
+             IS_VALID_STRING(name) == true)) {
+
+    s_op_lock(*thdptr);
+    {
+
+      (void)snprintf((*thdptr)->m_name, sizeof((*thdptr)->m_name), "%s", name);
+#ifdef HAVE_PTHREAD_SETNAME_NP
+      if ((*thdptr)->m_pthd != GALLUS_INVALID_THREAD) {
+        (void)pthread_setname_np((*thdptr)->m_pthd, (*thdptr)->m_name);
+      }
+#endif /* HAVE_PTHREAD_SETNAME_NP */
+
+    }
+    s_op_unlock(*thdptr);
+
+    return GALLUS_RESULT_OK;
+  } else {
+    return GALLUS_RESULT_INVALID_ARGS;
+  }
 }
 
 

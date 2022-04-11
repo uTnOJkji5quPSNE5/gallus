@@ -39,9 +39,9 @@ typedef struct gallus_hashmap_record 	*gallus_hashmap_t;
  * \b false stops the iteration.
  */
 typedef bool
-(*gallus_hashmap_iteration_proc_t)(void *key, void *val,
-                                    gallus_hashentry_t he,
-                                    void *arg);
+(*gallus_hashmap_iteration_proc_t)(const void *key, void *val,
+				gallus_hashentry_t he,
+				void *arg);
 
 
 /**
@@ -188,8 +188,8 @@ gallus_hashmap_clear_no_lock(gallus_hashmap_t *hmptr,
  */
 gallus_result_t
 gallus_hashmap_find(gallus_hashmap_t *hmptr,
-                     void *key,
-                     void **valptr);
+		 const void *key,
+		 void **valptr);
 
 
 /**
@@ -208,8 +208,8 @@ gallus_hashmap_find(gallus_hashmap_t *hmptr,
  */
 gallus_result_t
 gallus_hashmap_find_no_lock(gallus_hashmap_t *hmptr,
-                             void *key,
-                             void **valptr);
+			 const void *key,
+			 void **valptr);
 
 
 /**
@@ -261,9 +261,9 @@ gallus_hashmap_find_no_lock(gallus_hashmap_t *hmptr,
  */
 gallus_result_t
 gallus_hashmap_add(gallus_hashmap_t *hmptr,
-                    void *key,
-                    void **valptr,
-                    bool allow_overwrite);
+		const void *key,
+		void **valptr,
+		bool allow_overwrite);
 
 
 /**
@@ -317,9 +317,9 @@ gallus_hashmap_add(gallus_hashmap_t *hmptr,
  */
 gallus_result_t
 gallus_hashmap_add_no_lock(gallus_hashmap_t *hmptr,
-                            void *key,
-                            void **valptr,
-                            bool allow_overwrite);
+			const void *key,
+			void **valptr,
+			bool allow_overwrite);
 
 
 /**
@@ -345,9 +345,9 @@ gallus_hashmap_add_no_lock(gallus_hashmap_t *hmptr,
  */
 gallus_result_t
 gallus_hashmap_delete(gallus_hashmap_t *hmptr,
-                       void *key,
-                       void **valptr,
-                       bool free_value);
+		   const void *key,
+		   void **valptr,
+		   bool free_value);
 
 
 /**
@@ -375,9 +375,9 @@ gallus_hashmap_delete(gallus_hashmap_t *hmptr,
  */
 gallus_result_t
 gallus_hashmap_delete_no_lock(gallus_hashmap_t *hmptr,
-                               void *key,
-                               void **valptr,
-                               bool free_value);
+			   const void *key,
+			   void **valptr,
+			   bool free_value);
 
 
 /**

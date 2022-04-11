@@ -41,6 +41,8 @@
 #undef HAVE_ASSERT_H
 #undef HAVE_POLL_H
 #undef HAVE_SYS_SOCKET_H
+#undef HAVE_SYS_MMAN_H
+#undef HAVE_SYS_PRCTL_H
 #undef HAVE_NUMA_H
 #undef HAVE_NUMAIF_H
 
@@ -55,6 +57,13 @@
 #undef SIZEOF_SIZE_T
 #undef SIZEOF_VOID_P
 #undef SIZEOF_PTHREAD_T
+
+#undef HAVE_PROCFS_SELF_EXE
+#undef HAVE_PTHREAD_SETNAME_NP
+#undef HAVE_PTHREAD_SETAFFINITY_NP
+
+#undef HAVE_NUMA
+#undef HAVE_PRINT_FORMAT_FOR_SIZE_T
 
 #include "gallus_platform.h"
 

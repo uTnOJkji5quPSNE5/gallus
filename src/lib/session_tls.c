@@ -29,6 +29,7 @@ valid_path(const char *path, const bool is_file);
 
 static gallus_mutex_t lock = NULL;
 static pthread_once_t initialized = PTHREAD_ONCE_INIT;
+static bool s_is_inited = false;
 
 static gallus_result_t
 (*check_certificates_default)(const char *issuer_dn,
@@ -250,6 +251,8 @@ initialize_internal(void) {
   s_checkcert_init();
 
   gallus_session_tls_set_certcheck_default(s_check_certificates);
+
+  s_is_inited = true;
 }
 
 gallus_result_t
@@ -870,14 +873,16 @@ s_ctors(void) {
 
 static void
 s_dtors(void) {
-  if (gallus_module_is_unloading() &&
-      gallus_module_is_finalized_cleanly()) {
-    s_checkcert_final();
+  if (s_is_inited == true) {
+    if (gallus_module_is_unloading() &&
+        gallus_module_is_finalized_cleanly()) {
+      s_checkcert_final();
 
-    gallus_msg_debug(10, "The session/TLS module is finalized.\n");
-  } else {
-    gallus_msg_debug(10, "The session/TLS module  is not finalized "
-                      "because of module finalization problem.\n");
+      gallus_msg_debug(10, "The session/TLS module is finalized.\n");
+    } else {
+      gallus_msg_debug(10, "The session/TLS module  is not finalized "
+                    "because of module finalization problem.\n");
+    }
   }
 }
 

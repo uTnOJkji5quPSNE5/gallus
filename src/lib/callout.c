@@ -49,6 +49,7 @@ typedef gallus_result_t
 
 
 static pthread_once_t s_once = PTHREAD_ONCE_INIT;
+static bool s_is_inited = false;
 
 static gallus_mutex_t s_sched_lck = NULL;	/* The scheduler main lock. */
 static gallus_cond_t s_sched_cnd = NULL;		/* The scheduler cond. */
@@ -223,6 +224,8 @@ s_once_proc(void) {
   }
 
   TAILQ_INIT(&s_chrono_tsk_q);
+
+  s_is_inited = true;
 }
 
 
@@ -253,15 +256,17 @@ s_final(void) {
 
 static void
 s_dtors(void) {
-  if (gallus_module_is_unloading() &&
-      gallus_module_is_finalized_cleanly()) {
+  if (s_is_inited == true) {
+    if (gallus_module_is_unloading() &&
+        gallus_module_is_finalized_cleanly()) {
 
-    s_final();
+      s_final();
 
-    gallus_msg_debug(10, "The callout module is finalized.\n");
-  } else {
-    gallus_msg_debug(10, "The callout module is not finalized because of "
-                      "module finalization problem.\n");
+      gallus_msg_debug(10, "The callout module is finalized.\n");
+    } else {
+      gallus_msg_debug(10, "The callout module is not finalized because of "
+                    "module finalization problem.\n");
+    }
   }
 }
 
@@ -394,12 +399,15 @@ s_start_callout_main_loop(void) {
 
       gallus_chrono_t now;
       gallus_chrono_t next_wakeup;
+#if 0
       gallus_chrono_t prev_wakeup;
+#endif
 
       int cstate = 0;
 
+#if 0
       WHAT_TIME_IS_IT_NOW_IN_NSEC(prev_wakeup);
-
+#endif
       (void)gallus_mutex_enter_critical(&s_sched_lck, &cstate);
       {
         s_is_stopped = false;
@@ -416,7 +424,9 @@ s_start_callout_main_loop(void) {
 
 #ifdef CO_MSG_DEBUG
           gallus_msg_debug(3, "now:  " PF64(d) "\n", now);
+#if 0
           gallus_msg_debug(3, "prv:  " PF64(d) "\n", prev_wakeup);
+#endif
           gallus_msg_debug(3, "to:   " PF64(d) "\n", timeout);
 #endif /* CO_MSG_DEBUG */
 
@@ -575,7 +585,9 @@ s_start_callout_main_loop(void) {
                               timeout);
 #endif /* CO_MSG_DEBUG */
 
+#if 0
             prev_wakeup = next_wakeup;
+#endif
 
             r = gallus_bbq_wait_gettable(&s_urgent_tsk_q, timeout);
             if (unlikely(r <= 0 &&
@@ -597,7 +609,9 @@ s_start_callout_main_loop(void) {
           } else {
             WHAT_TIME_IS_IT_NOW_IN_NSEC(next_wakeup);
 
+#if 0
             prev_wakeup = next_wakeup;
+#endif
 
 #ifdef CO_MSG_DEBUG
             gallus_msg_debug(4, "timeout zero. contiune.\n");

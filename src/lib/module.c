@@ -66,6 +66,8 @@ static volatile size_t s_cur_module_idx = 0;
 static volatile bool s_is_unloading = false;
 
 static pthread_once_t s_once = PTHREAD_ONCE_INIT;
+static bool s_is_inited = false;
+static bool s_is_mods_inited = false;
 static gallus_mutex_t s_lck = NULL;
 static gallus_cond_t s_cnd = NULL;
 
@@ -115,6 +117,8 @@ s_once_proc(void) {
     gallus_perror(GALLUS_RESULT_POSIX_API_ERROR);
     gallus_exit_fatal("can't add an exit handler.\n");
   }
+
+  s_is_inited = true;
 }
 
 
@@ -145,9 +149,11 @@ s_final(void) {
 
 static void
 s_dtors(void) {
-  s_final();
+  if (s_is_inited == true) {
+    s_final();
 
-  gallus_msg_debug(10, "The module manager is finalized.\n");
+    gallus_msg_debug(10, "The module manager is finalized.\n");
+  }
 }
 
 
@@ -685,6 +691,7 @@ gallus_module_initialize_all(int argc, const char *const argv[]) {
 
     if (ret == GALLUS_RESULT_OK) {
       s_gstate = MODULE_GLOBAL_STATE_INITIALIZED;
+      s_is_mods_inited = true;
     }
 
   }
@@ -959,13 +966,29 @@ gallus_module_find(const char *name) {
 
 bool
 gallus_module_is_finalized_cleanly(void) {
-  return (s_n_modules == s_n_finalized_modules) ? true : false;
+  if (s_is_inited == true && s_is_mods_inited == true) {
+    return (s_n_modules == s_n_finalized_modules) ? true : false;
+  } else {
+    /*
+     * Module API is not used in the application.
+     * Just mimic it is used and finished cleanly.
+     */
+    return true;
+  }
 }
 
 
 bool
 gallus_module_is_unloading(void) {
-  mbar();
-  return (s_n_modules > 0) ? s_is_unloading : true;
+  if (s_is_inited == true && s_is_mods_inited == true) {
+    mbar();
+    return (s_n_modules > 0) ? s_is_unloading : true;
+  } else {
+    /*
+     * Module API is not used in the application.
+     * Just mimic it is unloading.
+     */
+    return true;
+  }
 }
 

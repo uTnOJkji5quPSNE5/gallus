@@ -101,7 +101,7 @@ uint16_t	gallus_log_get_debug_level(void);
 /**
  * Check where the log is emitted to.
  *
- *	@param[out]	A pointer to the argument that was passed via the \b gallus_log_get_destination(). (NULL allowed.)
+ *	@param[out]	arg	A pointer to the argument that was passed via the \b gallus_log_get_destination(). (NULL allowed.)
  *
  *	@returns The log destination.
  *
@@ -110,6 +110,26 @@ uint16_t	gallus_log_get_debug_level(void);
  */
 gallus_log_destination_t
 gallus_log_get_destination(const char **arg);
+
+
+/**
+ * Set/Unset multi-process mode
+ *
+ *	@param[in]	v	\btrue multi-process, \bfalse single-process.
+ */
+void
+gallus_log_set_multi_process(bool v);
+
+
+/**
+ * Get current multi-process mode
+ *
+ *	@param[in]	v	a pointer to return value.
+ *
+ *	@returns Always GALLUS_REULT_OK
+ */
+gallus_result_t
+gallus_log_get_multi_process(bool *v);
 
 
 /**

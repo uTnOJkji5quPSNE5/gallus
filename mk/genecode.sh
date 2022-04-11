@@ -13,7 +13,7 @@ cprfx=`echo ${prfx} | tr '[a-z]' '[A-Z]'`
 h=./src/include/${prfx}_ecode.h
 if test -r ./mk/ecode2h.awk; then
     nkf -Lu -d ./mk/ecode.def | \
-	gawk -f ./mk/ecode2h.awk -v prfx=${cprfx}_RESULT_ | \
+	awk -f ./mk/ecode2h.awk -v prfx=${cprfx}_RESULT_ | \
 	nkf -Lw -c > "${h}"
     st=$?
     if test ${st} -ne 0; then
@@ -24,7 +24,7 @@ fi
 c=./src/lib/ecode.c
 if test -r ./mk/ecode2c.awk; then
     nkf -Lu -d ./mk/ecode.def | \
-	gawk -F'"' -f ./mk/ecode2c.awk | \
+	awk -F'"' -f ./mk/ecode2c.awk | \
 	nkf -Lw -c > "${c}"
     st=$?
     if test ${st} -ne 0; then

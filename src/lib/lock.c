@@ -37,6 +37,7 @@ typedef int (*notify_proc_t)(pthread_cond_t *cnd);
 
 
 static pthread_once_t s_once = PTHREAD_ONCE_INIT;
+static bool s_is_inited = false;
 
 static notify_proc_t s_notify_single_proc = pthread_cond_signal;
 static notify_proc_t s_notify_all_proc = pthread_cond_broadcast;
@@ -68,6 +69,7 @@ s_once_proc(void) {
     gallus_exit_fatal("can't initialize a recursive mutex attribute.\n");
   }
 #undef RECURSIVE_MUTEX_ATTR
+  s_is_inited = true;
 }
 
 
@@ -93,16 +95,19 @@ s_final(void) {
 
 static void
 s_dtors(void) {
-  if (gallus_module_is_unloading() &&
-      gallus_module_is_finalized_cleanly()) {
-    s_final();
+  if (s_is_inited == true) {
+    if (gallus_module_is_unloading() &&
+        gallus_module_is_finalized_cleanly()) {
+      s_final();
 
-    gallus_msg_debug(10, "The mutex/lock APIs are finalized.\n");
-  } else {
-    gallus_msg_debug(10, "The mutex/lock APIs is not finalized "
-                      "because of module finalization problem.\n");
+      gallus_msg_debug(10, "The mutex/lock APIs are finalized.\n");
+    } else {
+      gallus_msg_debug(10, "The mutex/lock APIs is not finalized "
+                    "because of module finalization problem.\n");
+    }
   }
 }
+
 
 
 

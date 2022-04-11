@@ -5,6 +5,7 @@
 
 
 static pthread_once_t s_once = PTHREAD_ONCE_INIT;
+static bool s_is_inited = false;
 
 static gallus_mutex_t s_lck = NULL;
 static gallus_cond_t s_cond = NULL;
@@ -38,6 +39,8 @@ s_once_proc(void) {
   }
 
   (void)pthread_atfork(NULL, NULL, s_child_at_fork);
+
+  s_is_inited = true;
 }
 
 
@@ -70,15 +73,17 @@ s_final(void) {
 
 static void
 s_dtors(void) {
-  if (gallus_module_is_unloading() &&
-      gallus_module_is_finalized_cleanly()) {
+  if (s_is_inited == true) {
+    if (gallus_module_is_unloading() &&
+        gallus_module_is_finalized_cleanly()) {
 
-    s_final();
+      s_final();
 
-    gallus_msg_debug(10, "The global status tracker finalized.\n");
-  } else {
-    gallus_msg_debug(10, "The global status tracker is not finalized "
-                      "because of module finalization problem.\n");
+      gallus_msg_debug(10, "The global status tracker finalized.\n");
+    } else {
+      gallus_msg_debug(10, "The global status tracker is not finalized "
+                    "because of module finalization problem.\n");
+    }
   }
 }
 

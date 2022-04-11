@@ -409,6 +409,14 @@ void
 gallus_thread_module_finalize(void);
 
 
+gallus_result_t
+gallus_thread_get_name(const gallus_thread_t *thdptr, char *buf, size_t n);
+
+
+gallus_result_t
+gallus_thread_set_name(const gallus_thread_t *thdptr, const char *name);
+
+
 
 
 

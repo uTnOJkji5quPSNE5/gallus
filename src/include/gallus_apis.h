@@ -35,6 +35,10 @@
 #include "gallus_session_tls.h"
 #include "gallus_ip_addr.h"
 #include "gallus_qsort.h"
+#include "gallus_poolable.h"
+#include "gallus_pool.h"
+#include "gallus_pooled_thread.h"
+#include "gallus_task.h"
 
 
 

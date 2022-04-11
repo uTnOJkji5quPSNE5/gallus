@@ -186,14 +186,14 @@ connect_default(gallus_session_t s,
       GALLUS_RESULT_OK) {
     gallus_perror(r);
     free(saddr);
-    return -1;
+    return r;
   }
 
   if (s->family != saddr->sa_family) {
     gallus_msg_error("Bad address family ( %"PRIu8").\n",
                       saddr->sa_family);
     free(saddr);
-    return -1;
+    return GALLUS_RESULT_UNSUPPORTED;
   }
 
   if (s->sock < 0) {
@@ -201,22 +201,27 @@ connect_default(gallus_session_t s,
                          s->session_type & SESSION_ACTIVE ? true : false);
     if (sock < 0) {
       free(saddr);
-      return -1;
+      return GALLUS_RESULT_POSIX_API_ERROR;
     }
     s->sock = sock;
   }
 
   ret = connect(s->sock, saddr, saddr_len);
-  if (ret < 0 && errno != EINPROGRESS) {
-    gallus_msg_error("connect error %s\n", strerror(errno));
-    close(s->sock);
-    s->sock = -1;
-    free(saddr);
-    return ret;
+  if (ret < 0) {
+    if (errno == EINPROGRESS) {
+      free(saddr);
+      return GALLUS_RESULT_EINPROGRESS;
+    } else {
+      gallus_msg_error("connect error %s\n", strerror(errno));
+      close(s->sock);
+      s->sock = -1;
+      free(saddr);
+      return GALLUS_RESULT_POSIX_API_ERROR;
+    }
   }
 
   free(saddr);
-  return ret;
+  return GALLUS_RESULT_OK;
 }
 
 static void
@@ -626,7 +631,7 @@ session_connect(gallus_session_t s, gallus_ip_address_t *daddr, uint16_t dport,
   }
 
   ret = connect_default(s, daddr, dport);
-  if (ret < 0) {
+  if (ret != GALLUS_RESULT_OK && ret != GALLUS_RESULT_EINPROGRESS) {
     goto done;
   }
 

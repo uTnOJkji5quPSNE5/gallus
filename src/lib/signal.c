@@ -170,6 +170,8 @@ s_main(const gallus_thread_t *tptr, void *arg) {
 
   (void)arg;
 
+  (void)pthread_atfork(NULL, NULL, s_child_at_fork);
+
   if (tptr != NULL) {
     signal_thread_t st = (signal_thread_t)*tptr;
 
@@ -334,8 +336,6 @@ s_os_SIGUSR2_handler(int sig) {
 static void
 s_once_init_proc(void) {
   s_sigthd = &s_sigthd_rec;
-
-  (void)pthread_atfork(NULL, NULL, s_child_at_fork);
 
   (void)signal(SIGUSR2, s_os_SIGUSR2_handler);
 

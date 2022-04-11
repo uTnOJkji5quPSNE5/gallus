@@ -20,6 +20,8 @@ typedef struct gallus_thread_record {
 #endif /* HAVE_PTHREAD_SETAFFINITY_NP */
   void *m_arg;
 
+  bool m_is_allocd;
+
   char m_name[16];	/* max 16 characters. */
 
   pid_t m_creator_pid;

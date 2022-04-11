@@ -12,6 +12,7 @@ extern int end;
 
 static bool s_is_running_under_valgrind = false;
 static pthread_once_t s_once = PTHREAD_ONCE_INIT;
+static bool s_is_inited = false;
 static void s_ctors(void) __attr_constructor__(101);
 static void s_dtors(void) __attr_destructor__(101);
 
@@ -42,6 +43,8 @@ s_once_proc(void) {
     s_is_running_under_valgrind = true;
   }
   free((void *)a);
+
+  s_is_inited = true;
 }
 
 
@@ -64,7 +67,9 @@ s_final(void) {
 
 static void
 s_dtors(void) {
-  s_final();
+  if (s_is_inited == true) {
+    s_final();
+  }
 }
 
 
@@ -78,9 +83,15 @@ s_is_in_heap(const void *addr) {
             (((uintptr_t)addr) < ((uintptr_t)sbrk((intptr_t)0)))) ?
            true : false;
   } else {
+#ifdef __UNDER_SANITIZER__
+    gallus_msg_debug(10, "The malloc()'d address is not in "
+                  "sbrk() - end range, "
+                  "could be running under valgrind or -fsanitize.\n");
+#else
     gallus_msg_warning("The malloc()'d address is not in "
-                        "sbrk() - end range, "
-                        "could be running under the valgrind.\n");
+                    "sbrk() - end range, "
+                    "could be running under valgrind or -fsanitize.\n");
+#endif /* __UNDER_SANITIZER__ */
     return false;
   }
 }

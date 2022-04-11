@@ -243,7 +243,7 @@ s_wait_io_ready(gallus_cbuffer_t cb,
   if (cb != NULL && cptr != NULL) {
     if (nsec != 0LL) {
 
-      gallus_msg_debug(5, "wait " PF64(d) " nsec.\n",
+      gallus_msg_debug(500, "wait " PF64(d) " nsec.\n",
                         nsec);
 
       (void)__sync_fetch_and_add(&(cb->m_n_waiters), 1);
@@ -254,7 +254,7 @@ s_wait_io_ready(gallus_cbuffer_t cb,
         gallus_msg_debug(5, "awakened while sleeping " PF64(d) " nsec.\n",
                           nsec);
       } else {
-        gallus_msg_debug(5, "wait " PF64(d) " nsec done.\n",
+        gallus_msg_debug(500, "wait " PF64(d) " nsec done.\n",
                           nsec);
       }
 

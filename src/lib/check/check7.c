@@ -104,7 +104,7 @@ a_obj_set(a_obj_t o, bool val) {
       /*
        * fprintf() is a cancel point.
        */
-      fprintf(stderr, "%s:%d:%s:0x" PFTIDS(016, x) ": called.\n",
+      fprintf(stderr, "%s:%d:%s:0x" GALLUSIDS(016, x) ": called.\n",
               __FILE__, __LINE__, __func__, pthread_self());
     }
     (void)gallus_mutex_leave_critical(&(o->m_lock), cstate);
@@ -137,7 +137,7 @@ s_main(const gallus_thread_t *tptr, void *arg) {
           /*
            * fprintf() is a cancel point.
            */
-          fprintf(stderr, "%s:%d:%s:0x" PFTIDS(016, x) ": sleep one sec.\n",
+          fprintf(stderr, "%s:%d:%s:0x" GALLUSIDS(016, x) ": sleep one sec.\n",
                   __FILE__, __LINE__, __func__, pthread_self());
           sleep(1);
         }

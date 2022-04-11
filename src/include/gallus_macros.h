@@ -113,11 +113,11 @@
   MACRO_STRINGIFY(c)
 
 #if SIZEOF_PTHREAD_T == SIZEOF_INT64_T
-#define PFTID(c) PF64(c)
-#define PFTIDS(s, c) PF64S(s, c)
+#define GALLUSID(c) PF64(c)
+#define GALLUSIDS(s, c) PF64S(s, c)
 #elif SIZEOF_PTHREAD_T == SIZEOF_INT
-#define PFTID(c) STRINGIFY(%) MACRO_STRINGIFY(c)
-#define PFTIDS(s, c) STRINGIFY(%) MACRO_STRINGIFY(s) MACRO_STRINGIFY(c)
+#define GALLUSID(c) STRINGIFY(%) MACRO_STRINGIFY(c)
+#define GALLUSIDS(s, c) STRINGIFY(%) MACRO_STRINGIFY(s) MACRO_STRINGIFY(c)
 #endif /* SIZEOF_PTHREAD_T == SIZEOF_INT64_T ... */
 
 #define IS_VALID_STRING(x)	(((x) != NULL && *(x) != '\0') ? true : false)

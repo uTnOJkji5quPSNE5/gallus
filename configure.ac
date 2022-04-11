@@ -58,7 +58,18 @@ if test "x$LEX" != xflex -a "x$LEX" != xlex; then
    AC_MSG_ERROR([flex/lex must be installed.])
 fi
 AC_PROG_AWK
-AC_TYPE_SIGNAL
+AC_DIAGNOSE([obsolete],[your code may safely assume C89 semantics that RETSIGTYPE is void.
+Remove this warning and the `AC_CACHE_CHECK' when you adjust the code.])dnl
+AC_CACHE_CHECK([return type of signal handlers],[ac_cv_type_signal],[AC_COMPILE_IFELSE(
+[AC_LANG_PROGRAM([#include <sys/types.h>
+#include <signal.h>
+],
+		 [return *(signal (0, 0)) (0) == 1;])],
+		   [ac_cv_type_signal=int],
+		   [ac_cv_type_signal=void])])
+AC_DEFINE_UNQUOTED([RETSIGTYPE],[$ac_cv_type_signal],[Define as the return type of signal handlers
+		    (`int' or `void').])
+
 
 RM="rm -f"
 AC_SUBST(RM)
@@ -193,11 +204,13 @@ UNITY_SRC_DIR=
 
 developer=no
 AC_ARG_ENABLE([developer],
-	[AC_HELP_STRING([--enable-developer],
-	 [enable build for developers, like unit tests [default is no]])]
+	[AS_HELP_STRING([--enable-developer],[enable build for developers, like unit tests [default is no]])]
 	 ,[developer="$enableval"], [developer=no])
 
+IS_DEVELOPER=''
 if test "X${developer}" != "Xno"; then
+  IS_DEVELOPER=yes
+
   AC_CHECK_PROG([HAVE_NKF], [nkf], [yes], [])
 
   AC_CHECK_PROG([HAVE_RUBY], [ruby], [yes], [no])
@@ -218,6 +231,7 @@ if test "X${developer}" != "Xno"; then
   fi
 fi
 
+AC_SUBST(IS_DEVELOPER)
 AC_SUBST(HAVE_RUBY)
 AC_SUBST(HAVE_NKF)
 AC_SUBST(HAVE_GCOVR)
@@ -282,7 +296,8 @@ AC_CHECK_HEADER(sys/queue.h, [AC_DEFINE(HAVE_SYS_QUEUE_H)])
 AC_CHECK_HEADER(mcheck.h, [AC_DEFINE(HAVE_MCHECK_H)])
 AC_CHECK_HEADER(assert.h, [AC_DEFINE(HAVE_ASSERT_H)])
 AC_CHECK_HEADER(poll.h, [AC_DEFINE(HAVE_POLL_H)])
-AC_CHECK_HEADER(sys/socket.h, [AC_DEFINE(HAVE_SYS_SOCKET_H)])
+AC_CHECK_HEADER(sys/mman.h, [AC_DEFINE(HAVE_SYS_MMAN_H)])
+AC_CHECK_HEADER(sys/prctl.h, [AC_DEFINE(HAVE_SYS_PRCTL_H)])
 
 oLIBS=${LIBS}
 LIBS="${LIBS} -lpthread"
@@ -290,18 +305,79 @@ AC_CHECK_FUNCS([strlcpy strlcat, pthread_mutex_timedlock])
 LIBS=${oLIBS}
 AC_CHECK_FUNC(strtold, [AC_DEFINE(HAVE_STRTOLD)])
 
+# use libaio or not
+use_libaio=yes
+AC_ARG_WITH([libaio],
+	[AS_HELP_STRING([--enable-libaio],[enable libaio. [default: yes]])]
+	 ,[use_libaio="$withval"], [use_libaio=yes])
+
+# checking for libaio
+resultOK=0
+LIBAIO_LIBS=''
+if test "x${use_libaio}" = "xyes"; then
+    oLIBS=${LIBS}
+    LIBS='-laio'
+    AC_MSG_CHECKING([libaio and linux/aio_abi.h])
+    AC_RUN_IFELSE(
+	[AC_LANG_PROGRAM(
+	    [[#include <stdio.h>]
+	     [#include <stddef.h>]
+	     [#include <string.h>]
+	     [#include <linux/aio_abi.h>]],
+	    [[(void)io_submit(NULL, 0, NULL);]
+	     [return 0;]])],
+	[resultOK=1],
+	[AC_MSG_RESULT([not avairable.])],
+	[AC_MSG_RESULT([not checkable since cross-compilation.])])
+    if test ${resultOK} -eq 1; then
+        AC_MSG_RESULT([available.])
+	LIBAIO_LIBS='-laio'
+    fi
+    LIBS=${oLIBS}
+fi
+AC_SUBST(LIBAIO_LIBS)
+
+# use ivberbs or not
+use_ibverbs=yes
+AC_ARG_WITH([ibverbs],
+	[AS_HELP_STRING([--enable-ibverbs],[enable RDMA by libibverbs. [default: yes]])]
+	 ,[use_ibverbs="$withval"], [use_ibverbs=yes])
+
+# checking for ibverbs
+resultOK=0
+RDMA_LIBS=''
+if test "x${use_ibverbs}" = "xyes"; then
+    oLIBS=${LIBS}
+    LIBS='-libverbs'
+    AC_MSG_CHECKING([libibverbs and infiniband/ibverbs.h])
+    AC_RUN_IFELSE(
+	[AC_LANG_PROGRAM(
+	    [[#include <stdio.h>]
+	     [#include <stddef.h>]
+	     [#include <string.h>]
+	     [#include <infiniband/verbs.h>]],
+	    [[(void)ibv_fork_init();]
+	     [return 0;]])],
+	[resultOK=1],
+	[AC_MSG_RESULT([not avairable.])],
+	[AC_MSG_RESULT([not checkable since cross-compilation.])])
+    if test ${resultOK} -eq 1; then
+        AC_MSG_RESULT([available.])
+	RDMA_LIBS='-libverbs'
+    fi
+    LIBS=${oLIBS}
+fi
+AC_SUBST(RDMA_LIBS)
 
 # use DPDK or not
 use_dpdk=no
 AC_ARG_WITH([dpdk],
-	[AC_HELP_STRING([--enable-dpdk],
-	 [enable DPDK. [default: no]])]
+	[AS_HELP_STRING([--enable-dpdk],[enable DPDK. [default: no]])]
 	 ,[use_dpdk="$withval"], [use_dpdk=no])
 
 spdk_dir=''
 AC_ARG_ENABLE([spdk],
-	[AC_HELP_STRING([--with-spdk=/path/to/spdk],
-	 [specify SPDK installation directory (implies --with-dpdk.)])]
+	[AS_HELP_STRING([--with-spdk=/path/to/spdk],[specify SPDK installation directory (implies --with-dpdk.)])]
 	 ,[spdk_dir="$enableval"], [spdk_dir=''])
 if test "x${enable_spdk}" = "xyes" -o "x${enable_spdk}" = "xno"; then
     spdk_dir=''
@@ -500,8 +576,7 @@ LIBS=${oLIBS}
 NUMA_LIBS=''
 do_numa=${numa_supported}
 AC_ARG_ENABLE([numa],
-	[AC_HELP_STRING([--enable-numa],
-	 [Support NUMA (if supported).])],
+	[AS_HELP_STRING([--enable-numa],[Support NUMA (if supported).])],
 	[do_numa=${enableval}], [do_numa=${numa_supported}])
 if test "X${do_numa}" = "Xyes"; then
   if test "X${numa_supported}" != "Xyes"; then
