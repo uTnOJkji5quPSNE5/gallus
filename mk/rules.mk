@@ -488,6 +488,17 @@ summary::
 		mkdir -p $(TEST_RESULT_DIR); \
 	fi
 
+ifneq ($(DO_VALGRIND),)
+VALGRIND	=
+HELGRIND	=
+else
+VALGRIND	=	valgrind \
+			--leak-check=full \
+			--leak-resolution=high \
+			--show-leak-kinds=all
+HELGRIND	=	valgrind --tool=helgrind
+endif
+
 ifdef DIRS
 all depend clean distclean check check-nocolor valgrind helgrind install install-exe install-lib install-header install-config install-sbin exe symlink generate::
 	@for i in / $(DIRS) ; do \
@@ -586,27 +597,23 @@ check:: gcov
 	done
 
 valgrind::	$(TESTS)
+	echo $(VALGRIND); \
 	@for i in $(TESTS) ; do \
 		if test -x ./.libs/$${i} ; then \
 			rm -f ./vgcore.* ; \
-			LD_LIBRARY_PATH=$(UNITY_DIR)/src/.libs:$(BUILD_LIBDIR)/.libs:$(BUILD_AGENTDIR)/.libs:$(BUILD_DATAPLANEDIR)/.libs:$(BUILD_CONFIGDIR)/.libs:$(BUILD_EDITDIR)/.libs:$(BUILD_OFCONFDIR)/.libs:$(BUILD_OVSDBDIR)/.libs:$(BUILD_ETHOAMDIR)/.libs valgrind \
-				-v \
-				--leak-check=full \
-				--track-origins=yes \
-				./.libs/$${i} ; \
+			$(VALGRIND) ./.libs/$${i} ; \
 			if test $$? -ne 0 -a -f ./vgcore.* ; then \
 				mv ./vgcore.* $${i}.core ; \
 			fi ; \
 		fi ; \
 	done
 
+
 helgrind::	$(TESTS)
 	@for i in $(TESTS) ; do \
 		if test -x ./.libs/$${i} ; then \
 			rm -f ./vgcore.* ; \
-			LD_LIBRARY_PATH=$(UNITY_DIR)/src/.libs:$(BUILD_LIBDIR)/.libs:$(BUILD_AGENTDIR)/.libs:$(BUILD_DATAPLANEDIR)/.libs:$(BUILD_CONFIGDIR)/.libs:$(BUILD_EDITDIR)/.libs:$(BUILD_OFCONFDIR)/.libs:$(BUILD_OVSDBDIR)/.libs:$(BUILD_ETHOAMDIR)/.libs valgrind --tool=helgrind \
-				-v \
-				./.libs/$${i} ; \
+			$(HELGRIND) ./.libs/$${i} ; \
 			if test $$? -ne 0 -a -f ./vgcore.* ; then \
 				mv ./vgcore.* $${i}.core ; \
 			fi ; \
