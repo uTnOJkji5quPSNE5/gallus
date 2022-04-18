@@ -1,6 +1,11 @@
 #ifndef __GALLUS_SESSION_TLS_H__
 #define __GALLUS_SESSION_TLS_H__
 
+#ifdef ENABLE_DEPRECATED
+
+/*
+ * DEPRECATED.
+ */
 
 
 
@@ -234,5 +239,6 @@ __END_DECLS
 
 
 
+#endif /* ENABLE_DEPRECATED */
 
 #endif /* __GALLUS_SESSION_TLS_H__ */

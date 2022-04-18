@@ -1,3 +1,4 @@
 [submodule "tools/unity"]
 	path = tools/unity
 	url = http://github.com/ThrowTheSwitch/Unity.git
+	ignore = dirty

@@ -14,12 +14,18 @@ INSTALL_LIB_DIR		= $(DEST_LIBDIR)
 
 SRCS =	error.c logger.c hashmap.c chrono.c lock.c thread.c \
 	strutils.c cbuffer.c qmuxer.c qpoll.c \
-	heapcheck.c signal.c session.c session_tcp.c session_tls.c \
+	heapcheck.c signal.c \
 	pipeline_stage.c gstate.c module.c runnable.c dstring.c \
 	argv0.c ip_addr.c callout.c mainloop.c statistic.c numa.c \
 	poolable.c pool.c pooled_thread.c task.c
+DEPRECATED_SRCS =	session.c session_tcp.c session_tls.c
+
+ifdef (ENABLE_DEPRECATED)
+SRCS	+=	$(DEPRECATED_SRCS)
+endif
+
 ifneq (${OSDEF},GALLUS_OS_LINUX)
-SRCS +=	qsort.c
+SRCS	+=	qsort.c
 endif
 
 include $(MKRULESDIR)/rules.mk

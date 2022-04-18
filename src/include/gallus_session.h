@@ -1,6 +1,12 @@
 #ifndef __GALLUS_SESSION_H__
 #define __GALLUS_SESSION_H__
 
+#ifdef ENABLE_DEPRECATED
+
+/*
+ * DEPRECATED.
+ */
+
 /**
  * @file       gallus_session.h
  */
@@ -479,5 +485,6 @@ __END_DECLS
 
 
 
+#endif /* ENABLE_DEPRECATED */
 
 #endif /* __SESSION_H__ */
