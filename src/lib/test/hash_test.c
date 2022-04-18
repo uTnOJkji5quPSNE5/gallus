@@ -16,10 +16,7 @@ typedef struct {
 
 static void
 delete_entry(void *p) {
-  if (p != NULL) {
-    entry *e = (entry *)p;
-    free(e);
-  }
+  free(p);
 }
 
 static inline entry *
@@ -119,7 +116,7 @@ test_invalid_arguments(void) {
 void
 test_hash_table_add(void) {
   gallus_result_t rc;
-  entry *e, *ne;
+  entry *e, *ne, *old_ne;
   size_t i;
   uint64_t new_value = 10;
 
@@ -128,8 +125,8 @@ test_hash_table_add(void) {
     rc = gallus_hashmap_add(&ht, (void *)i, (void **)&e, false);
     TEST_ASSERT_EQUAL_GALLUS_STATUS(GALLUS_RESULT_OK, rc);
     TEST_ASSERT_NULL_MESSAGE(e,
-                             "If hashmap_add function occurred no confliction, "
-                             "valptr should be set to NULL");
+                             "If hashmap_add function occurred no "
+			     "confliction, valptr should be set to NULL");
   }
 
   for (i = 0; i < n_entry; i++) {
@@ -142,18 +139,24 @@ test_hash_table_add(void) {
   }
 
   i = 0;
-  ne = new_entry(new_value);
+  old_ne = ne = new_entry(new_value);
   rc = gallus_hashmap_add(&ht, (void *)i, (void **)&ne, false);
   TEST_ASSERT_EQUAL_GALLUS_STATUS_MESSAGE(GALLUS_RESULT_ALREADY_EXISTS, rc,
-      "If key already exists and overwrite is not allowed, "
-      "then hashmap_add function return GALLUS_RESULT_ALREADY_EXISTS");
+                                          "If key already exists and "
+                                          "overwrite is not allowed, then "
+                                          "hashmap_add function returns "
+                                          "GALLUS_RESULT_ALREADY_EXISTS");
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(i, ne->content,
-                                   "If hashmap_add function occurred a confliction, "
-                                   "valptr should be set to former value");
+                                   "If hashmap_add function occurred a "
+                                   "confliction, valptr should be set to "
+                                   "former value");
   rc = gallus_hashmap_find(&ht, (void *)i, (void *)&e);
   TEST_ASSERT_EQUAL(GALLUS_RESULT_OK, rc);
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(e->content, i,
-                                   "Failed hashmap_add function shouldn't change value");
+                                   "Failed hashmap_add function shouldn't "
+                                   "change value");
+
+  delete_entry((void *)old_ne);
 }
 
 void
@@ -168,15 +171,16 @@ test_hash_table_overwrite(void) {
     rc = gallus_hashmap_add(&ht, (void *)i, (void **)&e, false);
     TEST_ASSERT_EQUAL_GALLUS_STATUS(GALLUS_RESULT_OK, rc);
     TEST_ASSERT_NULL_MESSAGE(e,
-                             "If hashmap_add function occurred no confliction, "
-                             "valptr should be set to NULL");
+                             "If hashmap_add function occurred no "
+                             "confliction, valptr should be set to NULL");
   }
 
   for (i = 0; i < n_entry; i++) {
     rc = gallus_hashmap_find(&ht, (void *)i, (void *)&e);
     TEST_ASSERT_EQUAL_GALLUS_STATUS_MESSAGE(GALLUS_RESULT_OK, rc,
-        "If key is found in table, "
-        "then hashmap_find function return GALLUS_RESULT_OK");
+                                            "If key is found in table, "
+                                            "then hashmap_find function "
+                                            "returns GALLUS_RESULT_OK");
     TEST_ASSERT_EQUAL_UINT64_MESSAGE(i, e->content,
                                      "check a value of hash entry");
   }
@@ -185,15 +189,21 @@ test_hash_table_overwrite(void) {
   ne = new_entry(new_value);
   rc = gallus_hashmap_add(&ht, (void *)i, (void **)&ne, true);
   TEST_ASSERT_EQUAL_GALLUS_STATUS_MESSAGE(GALLUS_RESULT_OK, rc,
-      "If key already exists and overwrite is allowed, "
-      "then hashmap_add function return GALLUS_RESULT_OK");
+                                          "If key already exists and "
+                                          "overwrite is allowed, then "
+                                          "hashmap_add function return "
+                                          "GALLUS_RESULT_OK");
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(i, ne->content,
-                                   "If hashmap_add function occurred a confliction, "
-                                   "valptr should be set to former value");
+                                   "If hashmap_add function occurred a "
+                                   "confliction, valptr should be set to "
+                                   "former value");
+  delete_entry((void *)ne);
+
   rc = gallus_hashmap_find(&ht, (void *)i, (void *)&e);
   TEST_ASSERT_EQUAL(GALLUS_RESULT_OK, rc);
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(new_value, e->content,
-                                   "Succeeded hashmap_add function should change value");
+                                   "Succeeded hashmap_add function should "
+                                   "change value");
 }
 
 void
@@ -211,27 +221,34 @@ test_hash_table_delete(void) {
   i = 50;
   rc = gallus_hashmap_delete(&ht, (void *)i, (void **)&ne, true);
   TEST_ASSERT_EQUAL_GALLUS_STATUS_MESSAGE(GALLUS_RESULT_OK, rc,
-      "If key exists, "
-      "then hashmap_delete function return GALLUS_RESULT_OK");
+                                          "If key exists, then hashmap_delete "
+                                          "function returns GALLUS_RESULT_OK");
   rc = gallus_hashmap_find(&ht, (void *)i, (void *)&e);
   TEST_ASSERT_EQUAL_GALLUS_STATUS_MESSAGE(GALLUS_RESULT_NOT_FOUND, rc,
-      "Succeeded hashmap_delete function should delete a pair");
+                                          "Succeeded hashmap_delete function "
+                                          "should delete a pair");
 
   i = 51;
   rc = gallus_hashmap_delete(&ht, (void *)i, (void **)&ne, false);
   TEST_ASSERT_EQUAL_GALLUS_STATUS_MESSAGE(GALLUS_RESULT_OK, rc,
-      "If key exists, "
-      "then hashmap_delete function return GALLUS_RESULT_OK");
+                                          "If key exists, "
+                                          "then hashmap_delete function "
+                                          "returns GALLUS_RESULT_OK");
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(i, ne->content,
                                    "If an argument 'free_values' is false, "
-                                   "hashmap_delete function shouldn't free entries");
+                                   "hashmap_delete function shouldn't free "
+                                   "entries");
+  delete_entry((void *)ne);
+
   rc = gallus_hashmap_find(&ht, (void *)i, (void *)&ne);
   TEST_ASSERT_EQUAL_GALLUS_STATUS_MESSAGE(GALLUS_RESULT_NOT_FOUND, rc,
-      "Succeeded hashmap_delete function should delete a pair");
+                                          "Succeeded hashmap_delete function "
+                                          "should delete a pair");
   rc = gallus_hashmap_delete(&ht, (void *)i, (void **)&ne, false);
   TEST_ASSERT_EQUAL_GALLUS_STATUS_MESSAGE(GALLUS_RESULT_OK, rc,
-      "If key does not exist, "
-      "then hashmap_delete function return GALLUS_RESULT_OK");
+                                          "If key does not exist, "
+                                          "then hashmap_delete function "
+                                          "return GALLUS_RESULT_OK");
 }
 
 void
@@ -239,9 +256,10 @@ test_hash_table_clear(void) {
   gallus_result_t rc;
   entry *e, *ne;
   size_t i;
+  entry *es[n_entry];
 
   for (i = 0; i < n_entry; i++) {
-    e = new_entry(i);
+    es[i] = e = new_entry(i);
     rc = gallus_hashmap_add(&ht, (void *)i, (void **)&e, false);
     TEST_ASSERT_EQUAL_GALLUS_STATUS(GALLUS_RESULT_OK, rc);
   }
@@ -253,14 +271,16 @@ test_hash_table_clear(void) {
   TEST_ASSERT_EQUAL_GALLUS_STATUS(GALLUS_RESULT_OK, rc);
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(i, ne->content,
                                    "If an argument 'free_values' is false, "
-                                   "hashmap_clear function shouldn't free entries");
-  free(ne);
+                                   "hashmap_clear function shouldn't free "
+				   "entries");
+  delete_entry(ne);
 
   for (i = 0; i < n_entry; i++) {
-    e = new_entry(i);
-    rc = gallus_hashmap_add(&ht, (void *)i, (void **)&e, false);
-    TEST_ASSERT_EQUAL_GALLUS_STATUS(GALLUS_RESULT_OK, rc);
+    if (i != 50) {
+      delete_entry((void *)es[i]);
+    }
   }
+
   rc = gallus_hashmap_clear(&ht, true);
   TEST_ASSERT_EQUAL_GALLUS_STATUS(GALLUS_RESULT_OK, rc);
 }
